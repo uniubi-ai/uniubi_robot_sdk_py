@@ -1,0 +1,8 @@
+#ifndef UNIUBI_ROBOT_MOTION_SDK_MEDIA_FRAME_BINDINGS_H
+#define UNIUBI_ROBOT_MOTION_SDK_MEDIA_FRAME_BINDINGS_H
+
+#include <pybind11/pybind11.h>
+
+void bindMediaFrameTypes(pybind11::module_& m);
+
+#endif // UNIUBI_ROBOT_MOTION_SDK_MEDIA_FRAME_BINDINGS_H

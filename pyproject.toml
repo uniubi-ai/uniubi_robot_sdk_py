@@ -1,0 +1,37 @@
+# PEP 517 build config —— 让 `pip install .` / `pip wheel .` 可用
+# 构建后端用 scikit-build-core 走 CMake 流程
+#
+# 安装：
+#   cd uniubi_robot_sdk_py
+#   pip install . [-Ccmake.define.UNIUBI_SDK_ROOT=/opt/uniubi]
+#
+# 生成 wheel（不安装）：
+#   pip wheel . -w dist/
+
+[build-system]
+requires = ["scikit-build-core>=0.8"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "uniubi-robot-motion-sdk"
+version = "0.1.0"
+description = "Uniubi Robot Motion SDK – Python bindings"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [{ name = "Uniubi" }]
+license = { text = "Apache-2.0" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Documentation = "https://uniubi.com"
+
+[tool.scikit-build]
+# CMake 入口在当前目录（这个 Python 子项目自带 CMakeLists.txt）
+cmake.version = ">=3.18"
+wheel.packages = ["robot_motion_sdk"]
+# 把 native .so 装到包内
+install.components = []
+build-dir = "build/{wheel_tag}"
