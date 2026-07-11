@@ -120,8 +120,8 @@ def main() -> int:
             frame.valid = 1
             frame.control_id = 0  # 由 SDK 内部用 rawActionId 覆盖，此字段值实际不参与发送
             buttons = [0] * int(sdk.ButtonDefine.BUTTON_MAX)
-            buttons[int(sdk.ButtonDefine.buttonStart)] = 1  # Motion
-            buttons[int(sdk.ButtonDefine.buttonA)] = 1  # Motion+A = Lie Down（内部动作 laying）
+            buttons[int(sdk.ButtonDefine.buttonBack)] = 1  # Stand
+            buttons[int(sdk.ButtonDefine.buttonA)] = 1  # Stand+A = Lie Down（内部动作 laying）
             frame.buttons = buttons
             frame.axes = [0.0] * int(sdk.AxesDefine.AXES_MAX)  # axesLX/LY/RX/RY/LT/RT
             if not client.set_raw_control_cmd(frame):
