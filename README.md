@@ -15,7 +15,7 @@
 
 - Python ≥ 3.8
 - 已编译的 SDK 运行库（位于 `$UNIUBI_SDK_ROOT/lib/<arch>/` 或 `/opt/uniubi/lib/<arch>/`，`<arch>` ∈ `x86_64/aarch64/i386`）：
-  - `librobotMotionSdk.so`、`libubase.so`、`libmediaBus.so`：运行库包按同版本、同架构成组提供
+  - `librobotMotionSdk.so`、`libmediaBus.so`、`libudbus.so`、`libubase.so`：运行库包按同版本、同架构成组提供
   - `MediaBusClient` 功能仅 `aarch64` 板内本地媒体帧订阅支持；`x86_64` / `i386` 平台不要调用 `MediaBusClient`
 - pybind11 已 vendor 到 `ThirdParty/pybind11/`，无需另装
 
@@ -117,6 +117,8 @@ with sdk.MotionLowLevelClient() as client:
 ```
 
 动作相关控制帧建议同时携带 `LowLevelMotionCmd`：例如站立使用 `action = 1`、`ac_name = "standing"`，其它动作按对应的 action id 和动作名填写，便于服务端理解和外部观测。
+
+`MotionLowLevelClient.send_max_torque(action)` 可设置各电机最大扭矩。该接口只在 `kPrepared` 生效，使用 `action.motors[i].limb_no` / `joint_no` 定位电机、`torque` 携带目标上限；它是低频配置接口，不应放入高频 `send_control()` 控制循环。构建和运行 Python native 模块时，binding、公开头和 `librobotMotionSdk.so` 必须来自同一套 SDK。
 
 ### HighLevel
 

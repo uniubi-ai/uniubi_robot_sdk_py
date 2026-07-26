@@ -39,6 +39,12 @@
 
 跳过观测检查，可能会在机器人仍处于过渡姿态时交回控制权。
 
+## LowLevel 最大扭矩设置是低频配置
+
+`send_max_torque(action)` 仅在 `kPrepared` 状态下生效。`action.motor_num` 必须在 `[1, kLowLevelMaxMotorNum]` 范围内；每个元素使用 `limb_no` / `joint_no` 定位电机，并使用 `torque` 表示目标最大扭矩（N·m）。建议基于 `get_motor_layout()` 返回的布局构造完整配置。
+
+返回 `True` 只代表配置帧已提交到共享内存，不代表电机侧已经完成切换。底层默认存在约 10 ms 的扭矩切换窗口，期间不支持位置控制指令；不要将该接口放入高频 `send_control()` 循环，也不要在切换窗口内继续下发位置控制帧。可通过后续 `get_latest_observation()` 返回的 `motors[i].max_torque` 确认当前观测值。
+
 ## MediaBus 本地配置
 
 `MediaBusClient` 用于 `aarch64` 板内本地媒体帧订阅。远端 / 多设备 SDK 模式不提供 MediaBus 帧订阅；`x86_64` / `i386` 平台不要调用 `create_media_bus_client()`、`setup()` 或 `start_*_frame()`。
@@ -139,6 +145,6 @@ if not sdk.MEDIA_ENABLED:
 
 ## 运行库与 SHM 检查
 
-运行库必须使用同一交付版本、同一目标架构的一组文件。混用不同版本的 `librobotMotionSdk.so`、`libmediaBus.so`、DDS 库或 iceoryx 库，可能表现为服务超时、初始化失败或订阅无帧。
+运行库必须使用同一交付版本、同一目标架构的一组文件。`librobotMotionSdk.so` 和 `libmediaBus.so` 直接依赖 `libudbus.so` 与 `libubase.so`，四者不能跨版本混用；DDS 库和 iceoryx 库也必须与交付包匹配，否则可能表现为服务超时、初始化失败或订阅无帧。
 
 板内 LowLevel 和 MediaBus 链路依赖共享内存运行环境。如果进程报告没有可写的 iceoryx/RouDi SHM segment，应修正目标设备的运行账号权限或使用设备支持的开发者运行模式，不要通过随意修改系统文件权限来制造“通过”。

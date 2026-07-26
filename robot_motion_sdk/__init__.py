@@ -337,6 +337,10 @@ class MotionLowLevelClient:
         """
         return self._impl.send_control(action, cmd)
 
+    def send_max_torque(self, action: MotorCtrlAction) -> bool:
+        """下发一帧最大扭矩设置，使用 action.motors[i].torque 表示目标最大扭矩。"""
+        return self._impl.send_max_torque(action)
+
     def get_latest_observation(self, timeout_ms: int = 5) -> Optional[LowLevelMotionObserved]:
         """获取最近一帧运控观测（电机/IMU/TRC/电源），无新数据返回 None。
 

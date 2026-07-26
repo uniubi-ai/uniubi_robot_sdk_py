@@ -503,9 +503,11 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
         .def("emergency_stop", &IMotionLowLevelClient::emergencyStop, py::arg("timeout") = 5000,
              py::call_guard<py::gil_scoped_release>())
         .def("set_motion_enable", &IMotionLowLevelClient::setMotionEnable, py::arg("enable"))
-        .def("send_control",   [](IMotionLowLevelClient& self, const MotorCtrlAction& action, const LowLevelMotionCmd* cmd) {
+        .def("send_control", [](IMotionLowLevelClient& self, const MotorCtrlAction& action, const LowLevelMotionCmd* cmd) {
                 return self.sendControl(action, cmd);
             }, py::arg("action"), py::arg("cmd") = nullptr,
+             py::call_guard<py::gil_scoped_release>())
+        .def("send_max_torque", &IMotionLowLevelClient::sendMaxTorque, py::arg("action"),
              py::call_guard<py::gil_scoped_release>())
 #if UNIUBI_ROBOTSDK_PY_ENABLE_MEDIA
         .def("create_media_bus_client", &IMotionLowLevelClient::createMediaBusClient)
