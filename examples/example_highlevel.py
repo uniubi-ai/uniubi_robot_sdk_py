@@ -71,6 +71,17 @@ def main() -> int:
             elif topic == "statistics/device_status":
                 print(f"[evt] dev keys={list(info.keys())}")
 
+        def _on_obs(obs) -> None:
+            pass  # 50Hz 观测帧，此处仅注册示意，不打印避免刷屏
+
+        def _on_sensor(sensor) -> None:
+            odom = sensor.odom
+            print(f"[sensor] gps={sensor.gps.valid} odom={odom.valid} epoch={odom.epoch} "
+                  f"position=({odom.position[0]:.3f},{odom.position[1]:.3f}) yaw={odom.yaw:.3f}")
+
+        client.set_motion_observed_callback(_on_obs)
+        client.set_sensor_observed_callback(_on_sensor)
+
         # ── 2) 连接 ──
         if not client.connect(lease_ms=60000):
             print(f"connect failed: {client.get_last_error()}")
@@ -110,23 +121,6 @@ def main() -> int:
                 break
             time.sleep(0.1)
 
-        # ── 5b) 原始 TRC 控制帧（DDS topic motion/trc，不走 RPC）──
-        # 默认不发送真实原始控制帧；需要动作调试时打开开关，并确认场地、急停和人工接管。
-        # 前置：host proxy 已 setup TRC reader 并在 acquire 响应里下发 rawActionId（SDK 持权后自动接收）
-        # 若服务端 TRC reader 未配置 → SDK 收不到 rawActionId → set_raw_control_cmd 返 False + kActionRejected
-        enable_raw_control_demo = False
-        if enable_raw_control_demo:
-            frame = sdk.TRCStickFrame()
-            frame.valid = 1
-            frame.control_id = 0  # 由 SDK 内部用 rawActionId 覆盖，此字段值实际不参与发送
-            buttons = [0] * int(sdk.ButtonDefine.BUTTON_MAX)
-            buttons[int(sdk.ButtonDefine.buttonBack)] = 1  # Stand
-            buttons[int(sdk.ButtonDefine.buttonA)] = 1  # Stand+A = Lie Down（内部动作 laying）
-            frame.buttons = buttons
-            frame.axes = [0.0] * int(sdk.AxesDefine.AXES_MAX)  # axesLX/LY/RX/RY/LT/RT
-            if not client.set_raw_control_cmd(frame):
-                print(f"set_raw_control_cmd skipped/failed: {client.get_last_error()}")
-
         # ── 6) 音频：启动 → 暂停 → 停止 ──
         client.start_audio_play({
             "list": [{"id": "1"}],
@@ -148,21 +142,11 @@ def main() -> int:
             print("audio list:", audio_list)
 
         # ── 8) 观测量数据面：开使能 → 拉电源信息 ──
-        # set_observed_enable 用字段开关运控/传感器观测；
+        # set_observed_enable 用字段开关运控/传感器观测；GPS/UWB/odom 从 SensorObserved 读取；
         # get_power_info 的 timeout 是微秒级新鲜度窗口（仅返回此窗口内的最新电源量）。
-        def _on_obs(obs) -> None:
-            pass  # 50Hz 观测帧，此处仅注册示意，不打印避免刷屏
-
-        def _on_gps(gps) -> None:
-            print(f"[gps] valid={gps.valid} "
-                  f"point=({gps.point.lat:.6f},{gps.point.lng:.6f}) speed={gps.speed:.2f}")
-
         # set_observed_enable 返回当前实际生效的开关 dict（失败返回 None）
         state = client.set_observed_enable({"motionEnable": True, "sensorEnable": True})
         print(f"[obs] enabled, state={state}")
-        client.set_motion_observed_callback(_on_obs)
-        client.set_gps_callback(_on_gps)
-
         time.sleep(5)
         power = client.get_power_info(1_000_000)  # 1s 新鲜度窗口
         if power is not None:

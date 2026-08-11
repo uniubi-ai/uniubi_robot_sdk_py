@@ -354,7 +354,8 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
     py::class_<SensorObserved>(m, "SensorObserved")
         .def(py::init<>())
         .def_readonly("gps", &SensorObserved::gps)
-        .def_readonly("uwb", &SensorObserved::uwb);
+        .def_readonly("uwb", &SensorObserved::uwb)
+        .def_readonly("odom", &SensorObserved::odom);
 
     py::class_<TRCStickFrame>(m, "TRCStickFrame")
         .def(py::init<>())
@@ -397,6 +398,19 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
             for (uint32_t i = 0; i < n; ++i) lst.append(o.motors[i]);
             return lst;
         });
+
+    py::class_<MotionOdometry>(m,"MotionOdometry")
+        .def(py::init<>())
+        .def_property_readonly("position",[](const MotionOdometry& odometry) {
+            return py::make_tuple(odometry.position[0],odometry.position[1],odometry.position[2]);
+        })
+        .def_property_readonly("velocity",[](const MotionOdometry& odometry) {
+            return py::make_tuple(odometry.velocity[0],odometry.velocity[1],odometry.velocity[2]);
+        })
+        .def_readonly("yaw",&MotionOdometry::yaw)
+        .def_readonly("yaw_speed",&MotionOdometry::yawSpeed)
+        .def_readonly("epoch",&MotionOdometry::epoch)
+        .def_property_readonly("valid",[](const MotionOdometry& odometry) {return odometry.valid != 0;});
 
     /// ───────────────────────────────────────────────────────
     /// MediaBusClient（音视频帧订阅；由 *Client.create_media_bus_client() 工厂分配）
@@ -621,10 +635,6 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
         .def("move",            &IMotionHighLevelClient::move,
              py::arg("vx"), py::arg("vy"), py::arg("vyaw"), py::arg("timeout") = 5000,
              py::call_guard<py::gil_scoped_release>())
-        .def("set_raw_control_cmd",[](IMotionHighLevelClient& self, TRCStickFrame& frame) {
-                py::gil_scoped_release rel;
-                return self.setRawControlCmd(frame);
-            }, py::arg("frame"))
         .def("start_action",
             [](IMotionHighLevelClient& self, const std::string& action, py::object params, uint32_t timeout) {
                 std::string js = pyToJsonString(params);
@@ -640,26 +650,32 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
         /// ── 查询 ──
         .def("query_motion_state",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 std::string out;
+                bool ok;
                 {
                     py::gil_scoped_release rel;
-                    if (!self.queryMotionState(out, timeout)) return py::none();
+                    ok = self.queryMotionState(out, timeout);
                 }
+                if (!ok) return py::none();
                 return jsonStringToPy(out);
             },py::arg("timeout") = 5000)
         .def("get_motion_capabilities",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 std::string out;
+                bool ok;
                 {
                     py::gil_scoped_release rel;
-                    if (!self.getMotionCapabilities(out, timeout)) return py::none();
+                    ok = self.getMotionCapabilities(out, timeout);
                 }
+                if (!ok) return py::none();
                 return jsonStringToPy(out);
             },py::arg("timeout") = 5000)
         .def("query_system_status",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 std::string out;
+                bool ok;
                 {
                     py::gil_scoped_release rel;
-                    if (!self.querySystemStatus(out, timeout)) return py::none();
+                    ok = self.querySystemStatus(out, timeout);
                 }
+                if (!ok) return py::none();
                 return jsonStringToPy(out);
             },py::arg("timeout") = 5000)
         .def("get_motor_layout",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
@@ -676,10 +692,12 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
         .def("set_observed_enable",[](IMotionHighLevelClient& self, py::object params, uint32_t timeout) -> py::object {
                 std::string js = pyToJsonString(params);
                 std::string ret;
+                bool ok;
                 {
                     py::gil_scoped_release rel;
-                    if (!self.setObservedEnable(js, ret, timeout)) return py::none();
+                    ok = self.setObservedEnable(js, ret, timeout);
                 }
+                if (!ok) return py::none();
                 return jsonStringToPy(ret);
             }, py::arg("params") = py::none(), py::arg("timeout") = 5000)
         .def("get_power_info",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
@@ -692,6 +710,16 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 if (!ok) return py::none();
                 return py::cast(power);
             }, py::arg("timeout") = 5000)
+        .def("get_sensor_observation",[](IMotionHighLevelClient& self,uint32_t timeout) -> py::object {
+                SensorObserved sensor{};
+                bool ok;
+                {
+                    py::gil_scoped_release rel;
+                    ok = self.getSensorObservation(&sensor,timeout);
+                }
+                if (!ok) return py::none();
+                return py::cast(sensor);
+            },py::arg("timeout") = 5000)
         .def("set_motion_observed_callback",[](IMotionHighLevelClient& self, py::function cb) {
                 PyCallback callback = makePyCallback(std::move(cb));
                 self.setMotionObservedCallback([callback](const LowLevelMotionObserved& obs) {
@@ -699,11 +727,11 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                     try { (*callback)(obs); } catch (py::error_already_set& e) { e.discard_as_unraisable(__func__); }
                 });
             })
-        .def("set_gps_callback",[](IMotionHighLevelClient& self, py::function cb) {
+        .def("set_sensor_observed_callback",[](IMotionHighLevelClient& self,py::function cb) {
                 PyCallback callback = makePyCallback(std::move(cb));
-                self.setGPSCallback([callback](const GPSFrame& gps) {
+                self.setSensorObservedCallback([callback](const SensorObserved& sensor) {
                     py::gil_scoped_acquire g;
-                    try { (*callback)(gps); } catch (py::error_already_set& e) { e.discard_as_unraisable(__func__); }
+                    try {(*callback)(sensor);} catch (py::error_already_set& e) {e.discard_as_unraisable(__func__);}
                 });
             })
         /// ── 音频播放 / 灯光 ──
@@ -728,27 +756,33 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
             }, py::arg("params"), py::arg("timeout") = 5000)
         .def("query_audio_play_detail",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 std::string out;
+                bool ok;
                 {
                     py::gil_scoped_release rel;
-                    if (!self.queryAudioPlayDetail(out, timeout)) return py::none();
+                    ok = self.queryAudioPlayDetail(out, timeout);
                 }
+                if (!ok) return py::none();
                 return jsonStringToPy(out);
             }, py::arg("timeout") = 5000)
         .def("query_audio_play_list",[](IMotionHighLevelClient& self, py::object params, uint32_t timeout) -> py::object {
                 std::string js = pyToJsonString(params);
                 std::string out;
+                bool ok;
                 {
                     py::gil_scoped_release rel;
-                    if (!self.queryAudioPlayList(out, js, timeout)) return py::none();
+                    ok = self.queryAudioPlayList(out, js, timeout);
                 }
+                if (!ok) return py::none();
                 return jsonStringToPy(out);
             }, py::arg("params") = py::none(), py::arg("timeout") = 5000)
         .def("get_camera_light_brightness",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 std::string out;
+                bool ok;
                 {
                     py::gil_scoped_release rel;
-                    if (!self.getCameraLightBrightness(out, timeout)) return py::none();
+                    ok = self.getCameraLightBrightness(out, timeout);
                 }
+                if (!ok) return py::none();
                 return jsonStringToPy(out);
             }, py::arg("timeout") = 5000)
         .def("set_camera_light_brightness", &IMotionHighLevelClient::setCameraLightBrightness,

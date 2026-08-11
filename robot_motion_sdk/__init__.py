@@ -88,6 +88,7 @@ IMUObserved            = _native.IMUObserved
 PowerObserved          = _native.PowerObserved
 TRCStickFrame          = _native.TRCStickFrame
 LowLevelMotionObserved = _native.LowLevelMotionObserved
+MotionOdometry         = _native.MotionOdometry
 MediaLayout            = _native.MediaLayout
 SensorObserved         = _native.SensorObserved
 GPSFrame               = _native.GPSFrame
@@ -505,22 +506,6 @@ class MotionHighLevelClient:
         """速度控制行走。vx/vy 为线速度，vyaw 为偏航角速度。"""
         return self._impl.move(vx, vy, vyaw, timeout_ms)
 
-    def set_raw_control_cmd(self, frame: "TRCStickFrame") -> bool:
-        """发送原始 TRC 控制帧（必须先 start_control）。
-
-        前置：
-            - 当前必须处于 kControlled 状态
-            - host proxy 在 acquire 响应中下发了 rawActionId（服务端未下发 → 不支持 raw cmd）
-            - frame.valid 必须为非 0
-
-        Args:
-            frame: TRCStickFrame 实例。可读写字段：valid / control_id / buttons / axes。
-                   buttons 长度 = BUTTON_MAX，按 ButtonDefine 枚举顺序填；
-                   axes 长度 = AXES_MAX，按 AxesDefine 枚举顺序填。
-                   buttons/axes 接受 list，长度不足自动补 0，超长截断。
-        """
-        return self._impl.set_raw_control_cmd(frame)
-
     # — 查询 —
     def query_motion_state(self, timeout_ms: int = 5000) -> Optional[dict]:
         """查询当前运控状态。任何已 connect 状态均可。"""
@@ -547,7 +532,8 @@ class MotionHighLevelClient:
                 {"motionEnable": bool, "sensorEnable": bool}
                 - motionEnable：开启后 50Hz 推送运控观测（IMU+电机+电源），经
                   set_motion_observed_callback 回调上抛。
-                - sensorEnable：开启后推送传感器观测（GPS），经 set_gps_callback 回调上抛。
+                - sensorEnable：开启后推送完整传感器观测（GPS、UWB、odom），经
+                  set_sensor_observed_callback 回调上抛。
             timeout_ms: RPC 超时
 
         Returns:
@@ -565,17 +551,25 @@ class MotionHighLevelClient:
         """
         return self._impl.get_power_info(timeout_us)
 
+    def get_sensor_observation(self, timeout_ms: int = 5000) -> Optional[SensorObserved]:
+        """获取完整传感器观测，包含 GPS、UWB 和 ``odom``。
+
+        ``timeout_ms`` 是数据新鲜度窗口；该方法只读缓存，不发送 RPC，也不申请控制权。
+        """
+        return self._impl.get_sensor_observation(timeout_ms)
+
     def set_motion_observed_callback(self, cb: Callable[[LowLevelMotionObserved], None]) -> None:
         """注册运控观测回调；需先 set_observed_enable({"motionEnable": True})。
         cb(observed: LowLevelMotionObserved) —— 每帧触发一次。
         """
         self._impl.set_motion_observed_callback(cb)
 
-    def set_gps_callback(self, cb: Callable[[GPSFrame], None]) -> None:
-        """注册 GPS 观测回调；需先 set_observed_enable({"sensorEnable": True})。
-        cb(gps: GPSFrame) —— 每帧触发一次。
+    def set_sensor_observed_callback(self, cb: Callable[[SensorObserved], None]) -> None:
+        """注册完整传感器观测回调；需开启 ``sensorEnable``。
+
+        回调参数包含 GPS、UWB 和 ``odom``。
         """
-        self._impl.set_gps_callback(cb)
+        self._impl.set_sensor_observed_callback(cb)
 
     # — 音频播放器 —
     def start_audio_play(self, params: dict, timeout_ms: int = 5000) -> bool:
@@ -699,7 +693,7 @@ __all__ = [
     "MotorCtrl", "MotorCtrlAction", "LowLevelMotionCmd", "MotorObserved",
     "MotorInfo", "MotorLayout",
     "Vector3f", "Quaternionf", "IMUObserved", "PowerObserved", "TRCStickFrame",
-    "LowLevelMotionObserved",
+    "LowLevelMotionObserved", "MotionOdometry",
     "MediaLayout", "SensorObserved", "GPSFrame", "GEOGPoint", "UWBRawObserved",
 ]
 
