@@ -178,7 +178,7 @@ with sdk.MotionHighLevelClient() as client:
 | `MotorCtrl` / `MotorCtrlAction` / `LowLevelMotionCmd` / `LowLevelMotionObserved` | 同名 Python 类 |
 | `MotorInfo` / `MotorLayout` | 同名 Python 类（`get_motor_layout()` 返回） |
 | `IMUObserved` / `Vector3f` / `Quaternionf` / `PowerObserved` / `TRCStickFrame` | 同名 Python 类（`obs.imu` / `obs.power` / `obs.trc` 字段） |
-| `SensorObserved` / `GPSFrame` / `GEOGPoint` / `UWBRawObserved` | 同名 Python 类（`get_sensor_observation()` 返回；`sensor.gps` / `sensor.uwb`） |
+| `SensorObserved` / `GPSFrame` / `GEOGPoint` / `UWBRawObserved` / `MotionOdometry` | 同名 Python 类（HighLevel `get_sensor_observation()` 返回；通过 `sensor.gps` / `sensor.uwb` / `sensor.odom` 读取） |
 | `MediaLayout` | 同名 Python 类（运控 native 模块固定导出） |
 | `VideoFrame` / `AudioFrame` / `EncodedVideoFrame` | 同名 Python 类（仅 `sdk.MEDIA_ENABLED == True` 时导出，仅 `aarch64` 板内本地 `MediaBusClient` 帧订阅回调使用；详见媒体 SDK 手册） |
 | `ButtonDefine` / `AxesDefine` / `GPSSignalLevel` / `GEOGCoordMode` / `UWBPairState` / `MotionControlMode` | 同名 `IntEnum`（按键/摇杆下标、GPS/UWB/坐标系解码用） |
