@@ -1,0 +1,10 @@
+/build/
+/dist/
+/_skbuild/
+*.egg-info/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+robot_motion_sdk/_uniubi_robot_motion_py_native*.so
+.venv/
+*.swp

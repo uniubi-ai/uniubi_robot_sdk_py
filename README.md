@@ -41,6 +41,14 @@ pip install .
 产出标准 wheel，按 Python 版本附 ABI 后缀：
 `robot_motion_sdk/_uniubi_robot_motion_py_native.cpython-310-x86_64-linux-gnu.so`
 
+构建产物只写入隔离的 CMake / wheel 构建目录，不会在源码包目录中生成 native `.so`。需要生成可分发文件时使用：
+
+```bash
+UNIUBI_SDK_ROOT=~/uniubi_robot_sdk python3 -m pip wheel . -w dist
+```
+
+离线环境需要预先安装 `scikit-build-core` 和 CMake，然后为 pip 增加 `--no-build-isolation`，避免临时构建环境联网下载工具。
+
 ### 源码构建（开发期）
 
 ```bash
@@ -122,6 +130,25 @@ with sdk.MotionLowLevelClient() as client:
 
 ### HighLevel
 
+完整示例是交互式 CLI，启动后不会自动执行动作。首次连接先使用只读模式：
+
+```bash
+python3 examples/example_highlevel.py --read-only
+```
+
+进入 `highlevel>` 后可用 `status`、`motors`、`sensor 5`、`odom 5` 做只读检查；需要控制时再输入 `take`、`start`、`set`、`send`、`zero`、`stop` 和 `release`。例如限时前进：
+
+```text
+highlevel> take
+highlevel> start walking
+highlevel> send 3 {"lineVelocityX":0.3,"lineVelocityY":0,"velocity":0}
+highlevel> stop
+highlevel> release
+highlevel> quit
+```
+
+底层 API 的最小调用方式如下：
+
 ```python
 import time
 import robot_motion_sdk as sdk
@@ -149,6 +176,8 @@ with sdk.MotionHighLevelClient() as client:
 首次真实机器人联调建议只执行 `stand_up()` / `lie_down()`；`walking` / `move()` / `bipedStand` / `handstand` / `jump*` / `damp()` 属于高风险运动动作，应在空旷场地和人工接管条件下执行。
 
 更多见 `examples/`。
+
+示例作为可阅读、可修改的源码随仓库维护，不随 wheel 安装；安装后的业务程序只依赖 `robot_motion_sdk` 包。
 
 ## 3. 完整文档
 

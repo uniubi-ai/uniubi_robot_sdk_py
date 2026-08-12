@@ -1,180 +1,443 @@
-"""HighLevel 控制模式示例：连接 → 取控制权 → 动作 + 音频 → 释放 → 断开。
-
-用法：
-  python3 example_highlevel.py [iface]
-  iface 未提供时默认使用 eth0（远端/多设备模式生效；板内忽略）
-
-退出死锁规避（务必照做）：
-- 全程在 try/finally 里调度，finally 段显式调用 client.disconnect() + service.shutdown()
-- 不要依赖 Python GC 析构 client，机理详见 SDK 接口手册 §6.2
-- 装 SIGINT/SIGTERM handler 让 Ctrl+C 也走 finally 路径
-"""
+#!/usr/bin/env python3
+"""Interactive High-level SDK CLI. No motion action starts automatically."""
 
 from __future__ import annotations
 
+import argparse
 import json
+import select
 import signal
 import sys
+import threading
 import time
+from typing import Any, Optional
 
 import robot_motion_sdk as sdk
 
 
-_stop = False
+STOP_VELOCITY = {
+    "lineVelocityX": 0.0,
+    "lineVelocityY": 0.0,
+    "velocity": 0.0,
+}
+_stopping = False
 
 
-def _on_signal(signum, frame):
-    """SIGINT/SIGTERM —— 仅置位标志，不在 handler 内做 IO，避免重入死锁。"""
-    global _stop
-    _stop = True
+def on_signal(_signum: int, _frame: Any) -> None:
+    global _stopping
+    _stopping = True
+
+
+def pretty(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, indent=2, default=str)
+
+
+def parse_json_object(raw: str) -> dict[str, Any]:
+    value = json.loads(raw)
+    if not isinstance(value, dict):
+        raise ValueError("parameters must be a JSON object")
+    return value
+
+
+def wait_for_state(client: sdk.MotionHighLevelClient, expected: Any, timeout_s: float) -> bool:
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline and not _stopping:
+        if client.get_state() == expected:
+            return True
+        time.sleep(0.05)
+    return client.get_state() == expected
+
+
+def wait_for_rpc_discovery(
+    client: sdk.MotionHighLevelClient, timeout_s: float
+) -> Optional[dict[str, Any]]:
+    deadline = time.monotonic() + timeout_s
+    while not _stopping:
+        result = client.get_motion_capabilities()
+        if result is not None:
+            return result
+        if client.get_last_error() != sdk.HighLevelError.kRpcConnectFailed:
+            return None
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.2)
+    return None
+
+
+def sleep_interruptibly(seconds: float) -> None:
+    deadline = time.monotonic() + max(0.0, seconds)
+    while time.monotonic() < deadline and not _stopping:
+        time.sleep(min(0.1, deadline - time.monotonic()))
+
+
+def read_command(prompt: str) -> Optional[str]:
+    print(prompt, end="", flush=True)
+    while not _stopping:
+        readable, _, _ = select.select([sys.stdin], [], [], 0.1)
+        if readable:
+            line = sys.stdin.readline()
+            return line.strip() if line else None
+    return None
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--iface", default="eth0", help="network interface")
+    parser.add_argument("--client-id", default="uniubi-python-highlevel-cli")
+    parser.add_argument("--device-id", default="", help="target robot SN in multi-device mode")
+    parser.add_argument("--lease-ms", type=int, default=60000)
+    parser.add_argument("--discovery-timeout", type=float, default=10.0)
+    parser.add_argument(
+        "--read-only",
+        action="store_true",
+        help="connect without acquiring High-level control",
+    )
+    return parser
+
+
+class HighLevelConsole:
+    def __init__(self, client: sdk.MotionHighLevelClient) -> None:
+        self.client = client
+        self.capabilities: Optional[dict[str, Any]] = None
+        self.controlled = False
+        self.action_active = False
+        self._sensor_lock = threading.Lock()
+        self._latest_sensor: Any = None
+        self._sensor_frames = 0
+
+        @client.on_connect
+        def on_connect(state: sdk.HighLevelState, error: sdk.HighLevelError) -> None:
+            if state == sdk.HighLevelState.kControlled:
+                print("\n[INFO] High-level control acquired")
+            elif state == sdk.HighLevelState.kConnected and error != sdk.HighLevelError.kNone:
+                print(f"\n[WARN] control lost, error={error}")
+
+        @client.on_event
+        def on_event(topic: str, payload_json: str) -> None:
+            if topic == "control.status":
+                print(f"\n[EVENT] {topic}: {payload_json}")
+
+        def on_sensor(sensor: Any) -> None:
+            with self._sensor_lock:
+                self._latest_sensor = sensor
+                self._sensor_frames += 1
+
+        client.set_sensor_observed_callback(on_sensor)
+
+    def connect(self, lease_ms: int, discovery_timeout: float, read_only: bool) -> None:
+        if not self.client.connect(lease_ms=lease_ms):
+            self.fail("connect")
+        self.capabilities = wait_for_rpc_discovery(self.client, discovery_timeout)
+        if self.capabilities is None:
+            self.fail("get_motion_capabilities discovery")
+        print("[PASS] connected; no action has been started")
+
+        observed = self.client.set_observed_enable(
+            {"motionEnable": False, "sensorEnable": True}
+        )
+        if observed is None:
+            print(f"[WARN] enable SensorObserved failed, error={self.client.get_last_error()}")
+
+        if read_only:
+            print("[INFO] read-only mode; use 'take' before control commands")
+        else:
+            self.take_control()
+
+    def take_control(self) -> None:
+        if self.client.get_state() == sdk.HighLevelState.kControlled:
+            self.controlled = True
+            print("[INFO] control is already held")
+            return
+        if not self.client.start_control(timeout_ms=10000):
+            self.print_failure("take control")
+            return
+        if not wait_for_state(self.client, sdk.HighLevelState.kControlled, 10.0):
+            self.print_failure("wait controlled")
+            return
+        self.controlled = True
+        print("[PASS] control acquired; no action has been started")
+
+    def release_control(self) -> None:
+        if self.client.get_state() != sdk.HighLevelState.kControlled:
+            self.controlled = False
+            return
+        if self.action_active:
+            if self.client.set_action_params(STOP_VELOCITY):
+                print("[cleanup] walking velocity cleared before release")
+            else:
+                print(
+                    f"[WARN] velocity clear before release failed, "
+                    f"error={self.client.get_last_error()}",
+                    file=sys.stderr,
+                )
+            self.action_active = False
+        if not self.client.release_control():
+            self.print_failure("release control")
+            return
+        wait_for_state(self.client, sdk.HighLevelState.kConnected, 3.0)
+        self.controlled = False
+        print("[PASS] control released")
+
+    def require_control(self) -> bool:
+        if self.client.get_state() == sdk.HighLevelState.kControlled:
+            self.controlled = True
+            return True
+        self.controlled = False
+        print("[FAIL] High-level control is not held; run 'take' first")
+        return False
+
+    def run(self) -> None:
+        self.print_help()
+        while not _stopping:
+            line = read_command("highlevel> ")
+            if line is None:
+                break
+            if not line:
+                continue
+            try:
+                if not self.execute(line):
+                    break
+            except (ValueError, json.JSONDecodeError) as error:
+                print(f"[INPUT ERROR] {error}")
+
+    def execute(self, line: str) -> bool:
+        command, _, rest = line.partition(" ")
+        command = command.lower()
+        rest = rest.strip()
+
+        if command in ("quit", "exit"):
+            return False
+        if command in ("help", "?"):
+            self.print_help()
+        elif command in ("capabilities", "caps"):
+            self.query("capabilities", self.client.get_motion_capabilities)
+        elif command == "system":
+            self.query("system", self.client.query_system_status)
+        elif command == "state":
+            self.query("state", self.client.query_motion_state)
+        elif command == "motors":
+            self.print_motors()
+        elif command == "status":
+            self.query("capabilities", self.client.get_motion_capabilities)
+            self.query("system", self.client.query_system_status)
+            self.query("state", self.client.query_motion_state)
+            self.print_sensor(odom_only=False)
+        elif command == "take":
+            self.take_control()
+        elif command == "release":
+            self.release_control()
+        elif command == "start":
+            parts = rest.split(maxsplit=1)
+            if not parts:
+                raise ValueError("usage: start ACTION [JSON]")
+            if not self.require_control():
+                return True
+            action = parts[0]
+            params = parse_json_object(parts[1]) if len(parts) == 2 else None
+            if self.client.start_action(action, params):
+                self.action_active = True
+                print(f"[PASS] started {action}")
+            else:
+                self.print_failure(f"start {action}")
+        elif command == "set":
+            if not rest:
+                raise ValueError("usage: set JSON")
+            if self.require_control():
+                self.result(
+                    self.client.set_action_params(parse_json_object(rest)),
+                    "params set; action remains active",
+                )
+        elif command == "send":
+            duration_raw, separator, params_raw = rest.partition(" ")
+            if not separator:
+                raise ValueError("usage: send SECONDS JSON")
+            duration = float(duration_raw)
+            if duration <= 0:
+                raise ValueError("SECONDS must be positive")
+            params = parse_json_object(params_raw.strip())
+            if self.require_control() and self.client.set_action_params(params):
+                print(f"[PASS] command active for {duration:g}s")
+                sleep_interruptibly(duration)
+                self.result(
+                    self.client.set_action_params(STOP_VELOCITY),
+                    "timed command finished; walking velocity cleared",
+                )
+            elif self.client.get_state() == sdk.HighLevelState.kControlled:
+                self.print_failure("set params")
+        elif command == "zero":
+            if self.require_control():
+                self.result(
+                    self.client.set_action_params(STOP_VELOCITY),
+                    "walking velocity cleared; action remains active",
+                )
+        elif command == "stop":
+            if self.require_control() and self.client.stop_action():
+                self.action_active = False
+                print("[PASS] stop action requested")
+            elif self.client.get_state() == sdk.HighLevelState.kControlled:
+                self.print_failure("stop action")
+        elif command == "estop":
+            if self.require_control():
+                self.result(self.client.emergency_stop(), "emergency stop requested")
+        elif command in ("sensor", "odom"):
+            seconds = float(rest) if rest else (5.0 if command == "odom" else 0.0)
+            if seconds < 0:
+                raise ValueError("SECONDS must be non-negative")
+            self.observe(seconds, odom_only=command == "odom")
+        else:
+            print(f"[FAIL] unknown command: {command} (use help)")
+        return True
+
+    def query(self, name: str, call: Any) -> None:
+        value = call()
+        if value is None:
+            self.print_failure(name)
+        else:
+            print(pretty(value))
+
+    def print_motors(self) -> None:
+        layout = self.client.get_motor_layout()
+        if layout is None:
+            self.print_failure("motors")
+            return
+        print(f"motorNum={layout.motor_num}")
+        for motor in layout.motors:
+            print(f"  limb={motor.limb_no} joint={motor.joint_no} name={motor.name}")
+
+    def observe(self, seconds: float, odom_only: bool) -> None:
+        with self._sensor_lock:
+            first_frame = self._sensor_frames
+        if seconds > 0:
+            deadline = time.monotonic() + seconds
+            next_print = time.monotonic()
+            while time.monotonic() < deadline and not _stopping:
+                if time.monotonic() >= next_print:
+                    self.print_sensor(odom_only)
+                    next_print = time.monotonic() + 0.2
+                time.sleep(0.02)
+        else:
+            self.print_sensor(odom_only)
+        if seconds > 0:
+            with self._sensor_lock:
+                received = self._sensor_frames - first_frame
+            print(
+                f"[INFO] SensorObserved frames={received} elapsed={seconds:g}s "
+                f"rate={received / seconds:.2f}Hz"
+            )
+
+    def print_sensor(self, odom_only: bool) -> None:
+        with self._sensor_lock:
+            sensor = self._latest_sensor
+        if sensor is None:
+            print("[WAIT] no SensorObserved frame received")
+            return
+        odom = sensor.odom
+        prefix = "" if odom_only else f"sensor gps={sensor.gps.valid} uwb={sensor.uwb.valid} "
+        print(
+            f"{prefix}odom valid={odom.valid} epoch={odom.epoch} "
+            f"pos=({odom.position[0]:.3f},{odom.position[1]:.3f},{odom.position[2]:.3f}) "
+            f"yaw={odom.yaw:.3f} "
+            f"vel=({odom.velocity[0]:.3f},{odom.velocity[1]:.3f},{odom.velocity[2]:.3f}) "
+            f"yawSpeed={odom.yaw_speed:.3f}"
+        )
+
+    def close(self) -> None:
+        try:
+            observed = self.client.set_observed_enable(
+                {"motionEnable": False, "sensorEnable": False}
+            )
+            if observed is None:
+                print(
+                    f"[WARN] disable SensorObserved failed, "
+                    f"error={self.client.get_last_error()}",
+                    file=sys.stderr,
+                )
+        except Exception as error:  # noqa: BLE001
+            print(f"[WARN] disable SensorObserved failed: {error}", file=sys.stderr)
+        self.release_control()
+        self.client.disconnect()
+
+    def result(self, ok: bool, success: str) -> None:
+        if ok:
+            print(f"[PASS] {success}")
+        else:
+            self.print_failure(success)
+
+    def print_failure(self, operation: str) -> None:
+        print(f"[FAIL] {operation}, error={self.client.get_last_error()}")
+
+    def fail(self, operation: str) -> None:
+        raise RuntimeError(f"{operation} failed, error={self.client.get_last_error()}")
+
+    @staticmethod
+    def print_help() -> None:
+        print(
+            """Commands:
+  status                       query capabilities, system, state and sensor
+  capabilities | caps          list supported actions and parameters
+  system                       query robot system status
+  state                        query current motion state
+  motors                       query motor layout
+  odom [SECONDS]               print odometry at about 5 Hz (default 5s)
+  sensor [SECONDS]             print GPS/UWB/odometry observation
+  take                         acquire High-level control; starts no action
+  release                      release High-level control
+  start ACTION [JSON]          start an action
+  set JSON                     keep action parameters active
+  send SECONDS JSON            apply parameters, then clear walking velocity
+  zero                         clear walking velocity; action keeps running
+  stop                         stop the current RPC action
+  estop                        request emergency stop
+  quit                         clear velocity, release control and exit
+
+Examples:
+  start walking
+  send 3 {"lineVelocityX":0.3,"lineVelocityY":0,"velocity":0}
+  odom 5
+  zero
+  stop
+"""
+        )
 
 
 def main() -> int:
-    signal.signal(signal.SIGINT, _on_signal)
-    signal.signal(signal.SIGTERM, _on_signal)
+    args = build_parser().parse_args()
+    signal.signal(signal.SIGINT, on_signal)
+    signal.signal(signal.SIGTERM, on_signal)
 
-    # 远端 / 多设备场景指定网卡；板内忽略。argv[1] 可覆盖默认 eth0
-    iface = sys.argv[1] if len(sys.argv) > 1 else "eth0"
-    sdk.service.set_network_interface(iface)
-
-    if not sdk.service.initial(None, "myAppHighLevel"):
-        print("SDK init failed")
+    sdk.service.set_network_interface(args.iface)
+    if not sdk.service.initial(None, args.client_id):
+        print("[FAIL] sdk.service.initial", file=sys.stderr)
         return 1
 
-    # 板内单设备直接 MotionHighLevelClient()；远端多设备需要先 discoverDevices 拿 SN
-    if sdk.service.is_multi_device():
-        print("multi-device mode: use discover_devices() first to obtain a SN")
-        sdk.service.shutdown()
-        return 1
-    client = sdk.MotionHighLevelClient()
+    client: Optional[sdk.MotionHighLevelClient] = None
+    console: Optional[HighLevelConsole] = None
+    status = 0
     try:
-        # ── 1) 注册回调（必须在 connect 之前）──
-        @client.on_connect
-        def _on_connect(state: sdk.HighLevelState, err: sdk.HighLevelError) -> None:
-            if state == sdk.HighLevelState.kControlled:
-                print("[high] control acquired")
-            elif state == sdk.HighLevelState.kConnected:
-                if err == sdk.HighLevelError.kSessionExpired:
-                    print("[high] lease expired")
-                elif err == sdk.HighLevelError.kSessionRevoked:
-                    print("[high] preempted by others")
-                elif err == sdk.HighLevelError.kRpcAcquireRejected:
-                    print("[high] startControl rejected/timeout")
-                else:
-                    print("[high] control released")
-
-        @client.on_event
-        def _on_event(topic: str, payload_json: str) -> None:
-            info = json.loads(payload_json) if payload_json else {}
-            if topic == "statistics/play_list":
-                print(f"[evt] play idx={info.get('index')} playing={info.get('playing')}")
-            elif topic == "statistics/device_status":
-                print(f"[evt] dev keys={list(info.keys())}")
-
-        def _on_obs(obs) -> None:
-            pass  # 50Hz 观测帧，此处仅注册示意，不打印避免刷屏
-
-        def _on_sensor(sensor) -> None:
-            odom = sensor.odom
-            print(f"[sensor] gps={sensor.gps.valid} odom={odom.valid} epoch={odom.epoch} "
-                  f"position=({odom.position[0]:.3f},{odom.position[1]:.3f}) yaw={odom.yaw:.3f}")
-
-        client.set_motion_observed_callback(_on_obs)
-        client.set_sensor_observed_callback(_on_sensor)
-
-        # ── 2) 连接 ──
-        if not client.connect(lease_ms=60000):
-            print(f"connect failed: {client.get_last_error()}")
-            return 1
-
-        # ── 3) 查询类接口：能力 + 系统状态 ──
-        caps = client.get_motion_capabilities()
-        if caps is not None:
-            print("capabilities:", caps)
-
-        status = client.query_system_status()
-        if status is not None:
-            print("battery:", status.get("battery"))
-            print("network keys:", list((status.get("network") or {}).keys()))
-
-        # ── 4) 取控制权（异步；轮询等到 kControlled）──
-        if not client.start_control(timeout_ms=30000):
-            print(f"startControl failed: {client.get_last_error()}")
-            return 1
-
-        deadline = time.monotonic() + 30.0
-        while client.get_state() != sdk.HighLevelState.kControlled:
-            if _stop or time.monotonic() > deadline:
-                print("[high] not controlled, give up")
-                return 1
-            time.sleep(0.05)
-
-        # ── 5) 首跑安全动作 ──
-        client.stand_up()
-        for _ in range(50):  # 5s
-            if _stop:
-                break
-            time.sleep(0.1)
-        client.lie_down()
-        for _ in range(50):  # 5s
-            if _stop:
-                break
-            time.sleep(0.1)
-
-        # ── 6) 音频：启动 → 暂停 → 停止 ──
-        client.start_audio_play({
-            "list": [{"id": "1"}],
-            "volume": 50,
-            "repeat": 1,
-        })
-        time.sleep(5)
-        client.pause_audio_play()
-        time.sleep(1)
-        client.stop_audio_play()
-
-        # ── 7) 查询：音频详情 + 文件列表 ──
-        detail = client.query_audio_play_detail()
-        if detail is not None:
-            print("audio detail:", detail)
-
-        audio_list = client.query_audio_play_list({"type": "customVoice"})
-        if audio_list is not None:
-            print("audio list:", audio_list)
-
-        # ── 8) 观测量数据面：开使能 → 拉电源信息 ──
-        # set_observed_enable 用字段开关运控/传感器观测；GPS/UWB/odom 从 SensorObserved 读取；
-        # get_power_info 的 timeout 是微秒级新鲜度窗口（仅返回此窗口内的最新电源量）。
-        # set_observed_enable 返回当前实际生效的开关 dict（失败返回 None）
-        state = client.set_observed_enable({"motionEnable": True, "sensorEnable": True})
-        print(f"[obs] enabled, state={state}")
-        time.sleep(5)
-        power = client.get_power_info(1_000_000)  # 1s 新鲜度窗口
-        if power is not None:
-            print(f"[power] level={power.power}% health={power.health} temper={power.temper:.1f} "
-                  f"charge={power.charge_current:.2f}A/{power.charge_voltage:.2f}V")
-        client.set_observed_enable({"motionEnable": False, "sensorEnable": False})
-
-        # ── 9) 主动释放控制权 ──
-        client.release_control()
-
-        deadline = time.monotonic() + 3.0
-        while client.get_state() != sdk.HighLevelState.kConnected:
-            if _stop or time.monotonic() > deadline:
-                break
-            time.sleep(0.05)
-
+        if sdk.service.is_multi_device() and not args.device_id:
+            raise RuntimeError("multi-device mode requires --device-id SN")
+        client = sdk.MotionHighLevelClient(device_id=args.device_id)
+        console = HighLevelConsole(client)
+        console.connect(args.lease_ms, args.discovery_timeout, args.read_only)
+        console.run()
+    except Exception as error:  # noqa: BLE001
+        print(f"[FAIL] {error}", file=sys.stderr)
+        status = 1
     finally:
-        # ── 10) 显式释放 —— 不依赖 GC，避免退出死锁 ──
-        try:
-            client.disconnect()
-        except Exception as e:  # noqa: BLE001
-            print(f"disconnect raised: {e}")
-        try:
-            sdk.service.shutdown()
-        except Exception as e:  # noqa: BLE001
-            print(f"shutdown raised: {e}")
-
-    return 0
+        if console is not None:
+            try:
+                console.close()
+            except Exception as cleanup_error:  # noqa: BLE001
+                print(f"[WARN] cleanup failed: {cleanup_error}", file=sys.stderr)
+                status = 1
+        elif client is not None:
+            try:
+                client.disconnect()
+            except Exception as cleanup_error:  # noqa: BLE001
+                print(f"[WARN] disconnect failed: {cleanup_error}", file=sys.stderr)
+                status = 1
+        sdk.service.shutdown()
+    return status
 
 
 if __name__ == "__main__":

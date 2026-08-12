@@ -114,7 +114,7 @@ set_target_properties(_uniubi_robot_motion_py_native PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/robot_motion_sdk
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 # wheel 模式 (scikit-build-core)：DESTINATION 相对 wheel 根（即 site-packages），
