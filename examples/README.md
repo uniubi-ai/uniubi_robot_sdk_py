@@ -23,7 +23,7 @@ sudo env \
 |---|---|---|
 | `example_highlevel.py` | High-level 交互 CLI：状态、传感器/里程计、取权、动作和参数控制 | 启动不自动执行动作；控制命令要求空旷场地、急停可触达、有人值守 |
 | `example_lowlevel.py` | 进入低级控制并周期下发控制帧 | 必须使用吊架，急停可触达 |
-| `example_lowlevel_tensorrt.py` | 在 Orin 上用 TensorRT 执行 45 维观测、12 维动作的 Low-level 策略 | 先做 `--validate-only`；实机运行必须使用吊架，急停可触达 |
+| `example_lowlevel_tensorrt.py` | 在 Orin 上用 TensorRT 执行 45 维观测、12 维动作的 Low-level 策略 | 先做 `--validate-only`；吊架上验证 `stand` / `lay`，空旷平整地面再验证 `walk`；急停可触达 |
 | `example_media_frames.py` | 板内订阅并落盘媒体帧 | 仅 aarch64 且 `sdk.MEDIA_ENABLED` 为真 |
 
 这些文件是面向开发者阅读和修改的源码示例，不随 wheel 安装。它们始终跟随对应 Python SDK 版本维护。
@@ -80,7 +80,7 @@ sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
   --validate-only
 ```
 
-数值对比、Mock 闭环和吊架条件均确认后，再运行交互式 Low-level CLI：
+数值对比和 Mock 闭环均确认后，再运行交互式 Low-level CLI：
 
 ```bash
 sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
@@ -92,9 +92,14 @@ sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
 抖动，使观测数据获取耗时和 50 Hz 控制周期更稳定。如果目标设备已有不同的 CPU
 隔离或核分配方案，应改用实际分配给该控制进程的独立核心。
 
-程序连接后不会自动使能或执行策略。依次使用 `stand`、`walk 0.5 0 0`、`stop`、
-`lay`、`quit`；`quit` 会停止控制线程、关闭 Low-level、断开 SDK 并释放 CUDA buffer。
-TensorRT 构建失败时程序不会初始化 SDK 或连接机器人。
+程序连接后不会自动使能或执行策略。实机动作分两阶段验证：首先将机器狗可靠固定在
+安全吊架上，保持四脚完全腾空，只执行 `stand`、`lay`、`quit`；确认姿态、关节方向
+和急停均正常后，将机器狗放到空旷、平整、无障碍地面，再执行 `stand`、
+`walk 0.5 0 0`、`stop`、`lay`、`quit`。不要在四脚腾空时执行 `walk`；两个阶段都
+必须保持急停可触达并由专人值守。
+
+`quit` 会停止控制线程、关闭 Low-level、断开 SDK 并释放 CUDA buffer。TensorRT 构建
+失败时程序不会初始化 SDK 或连接机器人。
 
 `example_highlevel.py` 参考 8 号狗 Orin 上验证过的 `highlevel_sdk_console.py`，保持一个控制 lease 并在 `highlevel>` 提示符中逐条输入命令。首次连接建议：
 
