@@ -19,6 +19,31 @@
   - `MediaBusClient` 功能仅 `aarch64` 板内本地媒体帧订阅支持；`x86_64` / `i386` 平台不要调用 `MediaBusClient`
 - pybind11 已 vendor 到 `ThirdParty/pybind11/`，无需另装
 
+### Orin Low-level TensorRT 环境
+
+Uniubi 交付的大脑开发板已经预装 JetPack。不要为了运行 Python SDK 或 Low-level
+模型示例重复安装 `nvidia-jetpack`；先检查板上现有版本和系统时间：
+
+```bash
+date -Is
+apt-cache policy nvidia-jetpack
+sed -n '1p' /etc/nv_tegra_release
+/usr/local/cuda/bin/nvcc --version
+python3 -c 'import tensorrt as trt; print(trt.__version__)'
+```
+
+系统时间错误会导致 `apt` / `pip` 的 HTTPS 证书校验失败，应先校准时间再安装
+Python 包。JetPack 已提供 CUDA、TensorRT 运行库和 TensorRT Python binding；
+Low-level TensorRT 示例只额外需要 NumPy 和 CUDA Python：
+
+```bash
+sudo -H python3 -m pip install 'numpy>=1.26,<2' 'cuda-python>=12.6,<12.7'
+```
+
+该运行链路不依赖 PyTorch、TorchVision、ONNX Runtime 或 cuSPARSELt。Python 的
+`onnx` 包也不是运行模型的必要依赖：示例直接通过 TensorRT ONNX Parser 读取模型，
+并在每次进程启动时重新构建内存中的 FP32 engine，不读取或缓存 `.engine` 文件。
+
 ### MediaBus 构建开关
 
 2026-07-03 版 SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定：
@@ -73,6 +98,16 @@ export PYTHONPATH=~/uniubi_robot_sdk_py:$PYTHONPATH
 ## 2. 快速上手
 
 ### LowLevel
+
+基础通信示例见下文；完整的板端模型推理示例见
+[`examples/example_lowlevel_tensorrt.py`](examples/example_lowlevel_tensorrt.py)。后者使用
+TensorRT 10 + CUDA Python 执行 `[1,45] -> [1,12]` 的 FP32 速度策略，不导入 PyTorch。
+示例会先读取并校验实际 `MotorLayout` 的 12 关节 leg-major 顺序，再用其中的
+`limb_no` / `joint_no` 构造控制帧；模型输入输出采用独立的模型顺序契约，示例显式
+完成 SDK 顺序与模型顺序之间的双向重排。详见
+[`examples/README.md`](examples/README.md#关节顺序契约)。
+板端运行时建议通过 `taskset -c 2` 绑定 CPU 2，以减少调度抖动，使观测数据获取
+耗时和 50 Hz 控制周期更稳定。
 
 ```python
 import time
