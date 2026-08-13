@@ -1,6 +1,8 @@
-# Python SDK 示例
+# Python SDK Examples
 
-先准备 C++ SDK 运行库并安装 Python 包：
+[中文文档](README.zh-CN.md)
+
+Prepare the C++ SDK runtime libraries and install the Python package first:
 
 ```bash
 export UNIUBI_SDK_ROOT=/path/to/uniubi_robot_sdk
@@ -9,7 +11,7 @@ sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
 export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$(uname -m):${LD_LIBRARY_PATH}"
 ```
 
-示例直接从当前目录运行：
+Run examples directly from this directory:
 
 ```bash
 sudo env \
@@ -17,33 +19,30 @@ sudo env \
   python3 example_highlevel.py --read-only
 ```
 
-当前设备运行 SDK 示例需要 root 权限。大脑上直接使用系统 Python。上面的安装命令将 SDK 安装到系统 Python；Low-level 和媒体示例也使用相同的 `sudo env LD_LIBRARY_PATH=... python3` 前缀。
+SDK examples require root privileges on current devices. Use the system Python directly on the brain board. The installation command above installs the SDK into system Python; Low-level and media examples use the same `sudo env LD_LIBRARY_PATH=... python3` prefix.
 
-| 示例 | 行为 | 实机要求 |
+| Example | Behavior | Hardware requirements |
 |---|---|---|
-| `example_highlevel.py` | High-level 交互 CLI：状态、传感器/里程计、取权、动作和参数控制 | 启动不自动执行动作；控制命令要求空旷场地、急停可触达、有人值守 |
-| `example_lowlevel.py` | 进入低级控制并周期下发控制帧 | 必须使用吊架，急停可触达 |
-| `example_lowlevel_tensorrt.py` | 在 Orin 上用 TensorRT 执行 45 维观测、12 维动作的 Low-level 策略 | 先做 `--validate-only`；吊架上验证 `stand` / `lay`，空旷平整地面再验证 `walk`；急停可触达 |
-| `example_media_frames.py` | 板内订阅并落盘媒体帧 | 仅 aarch64 且 `sdk.MEDIA_ENABLED` 为真 |
+| `example_highlevel.py` | Interactive High-level CLI for state, sensors/odometry, ownership, actions, and parameters | Does not execute an action at startup; control commands require a clear area, reachable emergency stop, and attending operator |
+| `example_lowlevel.py` | Enters Low-level control and periodically sends control frames | Safety rig and reachable emergency stop required |
+| `example_lowlevel_tensorrt.py` | Runs a Low-level policy with 45-dimensional observations and 12-dimensional actions through TensorRT on Orin | Run `--validate-only` first; validate `stand` / `lay` on a rig, then `walk` on clear, level ground; emergency stop reachable |
+| `example_media_frames.py` | Subscribes to and saves on-board media frames | `aarch64` only and `sdk.MEDIA_ENABLED` must be true |
 
-这些文件是面向开发者阅读和修改的源码示例，不随 wheel 安装。它们始终跟随对应 Python SDK 版本维护。
+These are readable and editable source examples. They are not installed with the wheel and are maintained with the corresponding Python SDK version.
 
-## Low-level TensorRT 模型示例
+## Low-level TensorRT Model Example
 
-大脑上的 JetPack 已提供 CUDA 和 TensorRT。模型示例额外使用 NumPy 与 CUDA Python，
-不依赖 PyTorch、TorchVision 或 ONNX Runtime：
+JetPack on the brain board already provides CUDA and TensorRT. The model example additionally uses NumPy and CUDA Python and does not depend on PyTorch, TorchVision, or ONNX Runtime:
 
 ```bash
 sudo -H python3 -m pip install 'numpy>=1.26,<2' 'cuda-python>=12.6,<12.7'
 ```
 
-示例策略契约与 Mock 中的公开速度策略一致：输入 `[1,45]`，输出 `[1,12]`，控制
-频率 50 Hz。程序每次启动都从 `--onnx` 指定的模型重新构建 FP32 TensorRT engine，
-不读取或缓存 `.engine` 文件；构建发生在连接机器人之前。
+The example policy follows the same contract as the public Mock velocity policy: input `[1,45]`, output `[1,12]`, and a 50 Hz control rate. At every startup, the program rebuilds an FP32 TensorRT engine from the model passed with `--onnx`. It neither reads nor caches an `.engine` file, and the build occurs before connecting to the robot.
 
-### 关节顺序契约
+### Joint-order contract
 
-当前 `MotorLayout` 返回 12 个关节，SDK/机器人顺序为 leg-major：
+The current `MotorLayout` returns 12 joints. The SDK/robot uses leg-major order:
 
 ```text
 FL_ABAD, FL_HIP, FL_KNEE,
@@ -52,14 +51,9 @@ RL_ABAD, RL_HIP, RL_KNEE,
 RR_ABAD, RR_HIP, RR_KNEE
 ```
 
-示例不会只依赖硬编码数组下标。连接后先调用 `client.get_motor_layout()`，要求
-`motor_num == 12`，并逐项校验实际 `(limb_no, joint_no)` 顺序为
-`(0,0), (0,1), (0,2), ..., (3,2)`；数量或顺序不匹配时，会在使能 Low-level
-控制前退出。构造每个 `MotorCtrl` 时，也使用该 `MotorLayout` 项中的 `limb_no` 和
-`joint_no`，而不是自行推断控制帧的电机标识。
+The example does not rely only on hard-coded array indexes. After connecting, it first calls `client.get_motor_layout()`, requires `motor_num == 12`, and verifies that the actual `(limb_no, joint_no)` order is `(0,0), (0,1), (0,2), ..., (3,2)`. It exits before enabling Low-level control if the count or order does not match. Each `MotorCtrl` is also constructed with the `limb_no` and `joint_no` from the corresponding `MotorLayout` item rather than inferred motor identifiers.
 
-模型输入输出顺序属于模型训练和导出契约，不属于 SDK 契约，可能与上述 leg-major
-顺序不同。本示例的模型顺序为 joint-major：
+Model input and output order is part of the model's training and export contract, not the SDK contract, and may differ from the leg-major order above. This example model uses joint-major order:
 
 ```text
 FL_ABAD, FR_ABAD, RL_ABAD, RR_ABAD,
@@ -67,11 +61,9 @@ FL_HIP, FR_HIP, RL_HIP, RR_HIP,
 FL_KNEE, FR_KNEE, RL_KNEE, RR_KNEE
 ```
 
-因此示例在推理前显式执行 `SDK leg-major → model joint-major` 重排，并在生成控制帧
-前执行 `model joint-major → SDK leg-major` 反向重排。替换 ONNX 时必须同步核对并修改
-`MODEL_JOINT_ORDER`、观测归一化、action scale 和输入输出 shape，不能只替换模型文件。
+The example therefore explicitly reorders `SDK leg-major → model joint-major` before inference and `model joint-major → SDK leg-major` before generating control frames. When replacing the ONNX model, review and update `MODEL_JOINT_ORDER`, observation normalization, action scale, and input/output shapes together. Replacing only the model file is not sufficient.
 
-首次只加载 engine 并执行一次零输入推理，不连接机器人：
+For the first validation, load the engine and run one zero-input inference without connecting to the robot:
 
 ```bash
 sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
@@ -80,7 +72,7 @@ sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
   --validate-only
 ```
 
-数值对比和 Mock 闭环均确认后，再运行交互式 Low-level CLI：
+After numerical comparison and Mock closed-loop validation both pass, run the interactive Low-level CLI:
 
 ```bash
 sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
@@ -88,20 +80,13 @@ sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
   --onnx /path/to/policy.onnx
 ```
 
-板端运行时建议通过 `taskset -c 2` 将 Low-level 控制进程绑定到 CPU 2，以减少调度
-抖动，使观测数据获取耗时和 50 Hz 控制周期更稳定。如果目标设备已有不同的 CPU
-隔离或核分配方案，应改用实际分配给该控制进程的独立核心。
+On the board, pinning the Low-level control process to CPU 2 with `taskset -c 2` is recommended to reduce scheduler jitter and stabilize observation latency and the 50 Hz control period. If the target device already uses a different CPU isolation or allocation plan, use the isolated core assigned to the control process instead.
 
-程序连接后不会自动使能或执行策略。实机动作分两阶段验证：首先将机器狗可靠固定在
-安全吊架上，保持四脚完全腾空，只执行 `stand`、`lay`、`quit`；确认姿态、关节方向
-和急停均正常后，将机器狗放到空旷、平整、无障碍地面，再执行 `stand`、
-`walk 0.5 0 0`、`stop`、`lay`、`quit`。不要在四脚腾空时执行 `walk`；两个阶段都
-必须保持急停可触达并由专人值守。
+The program does not automatically enable control or execute the policy after connecting. Validate hardware motion in two stages. First secure the robot on a safety rig with all four feet fully clear, and execute only `stand`, `lay`, and `quit`. After confirming posture, joint directions, and emergency stop operation, place the robot on clear, level, obstacle-free ground and execute `stand`, `walk 0.5 0 0`, `stop`, `lay`, and `quit`. Do not execute `walk` while all four feet are suspended. During both stages, keep the emergency stop within reach and have a dedicated operator attend the robot.
 
-`quit` 会停止控制线程、关闭 Low-level、断开 SDK 并释放 CUDA buffer。TensorRT 构建
-失败时程序不会初始化 SDK 或连接机器人。
+`quit` stops the control thread, disables Low-level control, disconnects the SDK, and releases CUDA buffers. If the TensorRT build fails, the program does not initialize the SDK or connect to the robot.
 
-`example_highlevel.py` 参考 8 号狗 Orin 上验证过的 `highlevel_sdk_console.py`，保持一个控制 lease 并在 `highlevel>` 提示符中逐条输入命令。首次连接建议：
+`example_highlevel.py` follows the `highlevel_sdk_console.py` flow validated on dog 08's Orin. It keeps one control lease and accepts commands one at a time at the `highlevel>` prompt. Recommended first connection:
 
 ```text
 highlevel> status
@@ -116,4 +101,4 @@ highlevel> release
 highlevel> quit
 ```
 
-`--read-only` 只表示启动时不申请控制权，进入 CLI 后仍可显式执行 `take`。程序退出时会清零 walking 速度、释放控制权、关闭观测并显式 `disconnect()`，不会依赖 Python GC 清理。
+`--read-only` only prevents control acquisition at startup; you can still explicitly enter `take` from the CLI. On exit, the program zeros walking velocity, releases control, stops observation, and explicitly calls `disconnect()` rather than relying on Python garbage collection.

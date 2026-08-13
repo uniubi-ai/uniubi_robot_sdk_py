@@ -1,28 +1,29 @@
 # Uniubi Robot SDK Python
 
-机器人运控 SDK 的 Python 绑定，基于 pybind11。功能与 C++ SDK 等价；完整接口说明统一维护在 [`uniubi-docs`](https://github.com/uniubi-ai/uniubi-docs)。
+[中文文档](README.zh-CN.md)
 
-- `service`：全局初始化（一次）
-- `MotionLowLevelClient`：低级控制（关节级；RPC 控制面 + 板内共享内存(SHM) 数据面，仅板内单设备）
-- `MotionHighLevelClient`：高级控制（预置动作、RPC 控制权）
-- `MediaBusClient`：音视频帧订阅（由 `client.create_media_bus_client()` 派生，仅 `aarch64` 板内本地部署支持；详见 [`uniubi-docs/docs/uniubi_media_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_media_sdk.md)）
+Python bindings for the robot motion-control SDK, built with pybind11. They provide the same capabilities as the C++ SDK. Complete interface documentation is maintained in [`uniubi-docs`](https://github.com/uniubi-ai/uniubi-docs).
 
-**命名风格**：本包遵循 [PEP 8](https://peps.python.org/pep-0008/#function-and-variable-names)，方法 / 参数全部 `snake_case`（`get_state` / `start_control` 等）。C++ SDK 用 `camelCase`，两端**语义一一对应**仅风格不同；详见 [`uniubi-docs/docs/uniubi_high_level_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_high_level_sdk.md) §6.1（高级）与 [`uniubi-docs/docs/uniubi_low_level_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_low_level_sdk.md) §6.1（低级）的 C++ ↔ Python 映射表。
+- `service`: one-time global initialization
+- `MotionLowLevelClient`: joint-level control; RPC control plane plus on-board shared-memory (SHM) data plane; local single-device only
+- `MotionHighLevelClient`: built-in actions and RPC control ownership
+- `MediaBusClient`: audio/video frame subscription, created with `client.create_media_bus_client()`; local on-board `aarch64` only; see [`uniubi-docs/docs/uniubi_media_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_media_sdk.md)
 
-## 1. 快速安装
+**Naming:** this package follows [PEP 8](https://peps.python.org/pep-0008/#function-and-variable-names). Methods and parameters use `snake_case`, such as `get_state` and `start_control`. The C++ SDK uses `camelCase`; the semantics correspond one-to-one. See section 6.1 of the [High-level SDK](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_high_level_sdk.md) and [Low-level SDK](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_low_level_sdk.md) documentation for C++ ↔ Python mappings.
 
-### 依赖
+## 1. Quick Installation
 
-- Python ≥ 3.8
-- 已编译的 SDK 运行库（位于 `$UNIUBI_SDK_ROOT/lib/<arch>/` 或 `/opt/uniubi/lib/<arch>/`，`<arch>` ∈ `x86_64/aarch64/i386`）：
-  - `librobotMotionSdk.so`、`libmediaBus.so`、`libudbus.so`、`libubase.so`：运行库包按同版本、同架构成组提供
-  - `MediaBusClient` 功能仅 `aarch64` 板内本地媒体帧订阅支持；`x86_64` / `i386` 平台不要调用 `MediaBusClient`
-- pybind11 已 vendor 到 `ThirdParty/pybind11/`，无需另装
+### Requirements
 
-### Orin Low-level TensorRT 环境
+- Python 3.8 or later
+- Compiled SDK runtime libraries under `$UNIUBI_SDK_ROOT/lib/<arch>/` or `/opt/uniubi/lib/<arch>/`, where `<arch>` is `x86_64`, `aarch64`, or `i386`:
+  - `librobotMotionSdk.so`, `libmediaBus.so`, `libudbus.so`, and `libubase.so` must be delivered as a matched version and architecture set.
+  - `MediaBusClient` supports only local, on-board media-frame subscription on `aarch64`; do not call it on `x86_64` or `i386`.
+- pybind11 is vendored under `ThirdParty/pybind11/`; no separate installation is required.
 
-Uniubi 交付的大脑开发板已经预装 JetPack。不要为了运行 Python SDK 或 Low-level
-模型示例重复安装 `nvidia-jetpack`；先检查板上现有版本和系统时间：
+### Orin Low-level TensorRT environment
+
+Uniubi-provided brain boards ship with JetPack preinstalled. Do not reinstall `nvidia-jetpack` merely to run the Python SDK or Low-level model example. First inspect the installed version and system time:
 
 ```bash
 date -Is
@@ -32,50 +33,46 @@ sed -n '1p' /etc/nv_tegra_release
 python3 -c 'import tensorrt as trt; print(trt.__version__)'
 ```
 
-系统时间错误会导致 `apt` / `pip` 的 HTTPS 证书校验失败，应先校准时间再安装
-Python 包。JetPack 已提供 CUDA、TensorRT 运行库和 TensorRT Python binding；
-Low-level TensorRT 示例只额外需要 NumPy 和 CUDA Python：
+An incorrect system time causes HTTPS certificate validation failures in `apt` and `pip`; correct it before installing Python packages. JetPack already provides CUDA, the TensorRT runtime, and the TensorRT Python bindings. The Low-level TensorRT example additionally needs only NumPy and CUDA Python:
 
 ```bash
 sudo -H python3 -m pip install 'numpy>=1.26,<2' 'cuda-python>=12.6,<12.7'
 ```
 
-该运行链路不依赖 PyTorch、TorchVision、ONNX Runtime 或 cuSPARSELt。Python 的
-`onnx` 包也不是运行模型的必要依赖：示例直接通过 TensorRT ONNX Parser 读取模型，
-并在每次进程启动时重新构建内存中的 FP32 engine，不读取或缓存 `.engine` 文件。
+This runtime path does not depend on PyTorch, TorchVision, ONNX Runtime, or cuSPARSELt. The Python `onnx` package is also unnecessary at runtime: the example feeds the model directly to the TensorRT ONNX Parser and rebuilds an in-memory FP32 engine at every process startup, without reading or caching an `.engine` file.
 
-### MediaBus 构建开关
+### MediaBus build switch
 
-2026-07-03 版 SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定：
+The 2026-07-03 SDK Python native binding uses `UNIUBI_SDK_ENABLE_MEDIA` to control media-frame bindings:
 
-- 未显式指定时，`aarch64` 默认 `ON`，`x86_64` / `i386` 默认 `OFF`。
-- `OFF` 构建仍提供 LowLevel / HighLevel 运控接口，但 native 不编译媒体帧绑定，不提供 `MediaBusError` 和 `VideoFrame` / `AudioFrame` / `EncodedVideoFrame` 等媒体帧类型。
-- 运行时可用 `sdk.MEDIA_ENABLED` 判断当前 wheel 是否包含媒体绑定；为 `False` 时调用 `create_media_bus_client()` 会抛出 `RuntimeError("MediaBus is not available in this SDK build")`。
-- 只有 `aarch64` 板内本地部署应开启媒体绑定；不要为了让 `x86_64` / `i386` 编译通过而强行开启后调用媒体接口。
+- When unspecified, it defaults to `ON` on `aarch64` and `OFF` on `x86_64` / `i386`.
+- An `OFF` build still provides LowLevel and HighLevel motion interfaces, but does not compile media-frame bindings or expose `MediaBusError`, `VideoFrame`, `AudioFrame`, or `EncodedVideoFrame`.
+- At runtime, check `sdk.MEDIA_ENABLED`. When it is `False`, `create_media_bus_client()` raises `RuntimeError("MediaBus is not available in this SDK build")`.
+- Enable media bindings only for local on-board `aarch64` deployment. Do not force-enable them on `x86_64` / `i386` merely to compile and then call media interfaces.
 
-### pip install（推荐，独立 Python 项目）
+### pip install (recommended for an independent Python project)
 
 ```bash
 git clone https://github.com/uniubi-ai/uniubi_robot_sdk.git ~/uniubi_robot_sdk
 git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
-export UNIUBI_SDK_ROOT=~/uniubi_robot_sdk   # 或在命令行加 -Ccmake.define.UNIUBI_SDK_ROOT=...
+export UNIUBI_SDK_ROOT=~/uniubi_robot_sdk   # or pass -Ccmake.define.UNIUBI_SDK_ROOT=...
 sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
   python3 -m pip install .
 ```
 
-产出标准 wheel，按 Python 版本附 ABI 后缀：
+This produces a standard wheel with an ABI suffix for the Python version, for example:
 `robot_motion_sdk/_uniubi_robot_motion_py_native.cpython-310-x86_64-linux-gnu.so`
 
-构建产物只写入隔离的 CMake / wheel 构建目录，不会在源码包目录中生成 native `.so`。需要生成可分发文件时使用：
+Build artifacts are written only to isolated CMake and wheel build directories; no native `.so` is generated inside the source package directory. To create a distributable wheel:
 
 ```bash
 UNIUBI_SDK_ROOT=~/uniubi_robot_sdk python3 -m pip wheel . -w dist
 ```
 
-离线环境需要预先安装 `scikit-build-core` 和 CMake，然后为 pip 增加 `--no-build-isolation`，避免临时构建环境联网下载工具。
+For an offline environment, preinstall `scikit-build-core` and CMake, then add `--no-build-isolation` to prevent pip's temporary build environment from downloading tools.
 
-### 源码构建（开发期）
+### Editable source build
 
 ```bash
 git clone https://github.com/uniubi-ai/uniubi_robot_sdk.git ~/uniubi_robot_sdk
@@ -85,40 +82,34 @@ sudo -H env UNIUBI_SDK_ROOT=~/uniubi_robot_sdk \
   python3 -m pip install -e .
 ```
 
-可编辑安装后，修改 Python 包装层即时生效；修改 C++ binding 代码后需要重新安装。
+After editable installation, changes to the Python wrapper take effect immediately. Changes to the C++ binding require reinstallation.
 
-产物：`robot_motion_sdk/_uniubi_robot_motion_py_native.cpython-...so`
+Artifact: `robot_motion_sdk/_uniubi_robot_motion_py_native.cpython-...so`
 
-临时使用：
+For temporary use:
 
 ```bash
 export PYTHONPATH=~/uniubi_robot_sdk_py:$PYTHONPATH
 ```
 
-## 2. 快速上手
+## 2. Quick Start
 
 ### LowLevel
 
-基础通信示例见下文；完整的板端模型推理示例见
-[`examples/example_lowlevel_tensorrt.py`](examples/example_lowlevel_tensorrt.py)。后者使用
-TensorRT 10 + CUDA Python 执行 `[1,45] -> [1,12]` 的 FP32 速度策略，不导入 PyTorch。
-示例会先读取并校验实际 `MotorLayout` 的 12 关节 leg-major 顺序，再用其中的
-`limb_no` / `joint_no` 构造控制帧；模型输入输出采用独立的模型顺序契约，示例显式
-完成 SDK 顺序与模型顺序之间的双向重排。详见
-[`examples/README.md`](examples/README.md#关节顺序契约)。
-板端运行时建议通过 `taskset -c 2` 绑定 CPU 2，以减少调度抖动，使观测数据获取
-耗时和 50 Hz 控制周期更稳定。
+The basic communication example appears below. For a complete on-board model-inference example, see [`examples/example_lowlevel_tensorrt.py`](examples/example_lowlevel_tensorrt.py). It runs a `[1,45] -> [1,12]` FP32 velocity policy with TensorRT 10 and CUDA Python, without importing PyTorch. The example first reads and verifies the actual 12-joint leg-major `MotorLayout`, then builds control frames with its `limb_no` / `joint_no` fields. Model input and output follow a separate model-order contract, and the example explicitly reorders in both directions between SDK and model order. See the [joint-order contract](examples/README.md#joint-order-contract).
+
+On the board, pinning the process to CPU 2 with `taskset -c 2` is recommended to reduce scheduler jitter and stabilize observation latency and the 50 Hz control period.
 
 ```python
 import time
 import robot_motion_sdk as sdk
 
-sdk.service.set_network_interface("eth0")    # 远端/多设备时需要；板内忽略
+sdk.service.set_network_interface("eth0")    # required remotely/multi-device; ignored on-board
 sdk.service.initial(None, "myApp")
 
 with sdk.MotionLowLevelClient() as client:
     @client.on_connect
-    def _(state, err): print(state, err)   # state: LowLevelState 枚举；err: LowLevelError
+    def _(state, err): print(state, err)   # state: LowLevelState; err: LowLevelError
 
     client.connect(observed_hz=500)
     while client.get_state() != sdk.LowLevelState.kConnected:
@@ -128,16 +119,17 @@ with sdk.MotionLowLevelClient() as client:
     while client.get_state() != sdk.LowLevelState.kPrepared:
         time.sleep(0.05)
 
-    # 查询硬件电机布局（kConnected 后即可调用；本示例在 kPrepared 后调用）
+    # Query the hardware motor layout (available after kConnected; queried here after kPrepared).
     layout = client.get_motor_layout()
     print(f"motors={layout.motor_num}")
     for mi in layout.motors:
         print(f"  limb={mi.limb_no} joint={mi.joint_no} name={mi.name}")
 
-    # 硬件首跑安全前提：仅在吊架 / 急停可触达 / 空旷场地条件下运行。
-    # 下方零目标、零增益、零前馈力矩只是通信与观测闭环模板，不是平衡站立控制器。
-    # 真实闭环控制应从当前观测姿态初始化目标，并使用经过验证的阻尼、增益和力矩策略。
-    # 按 layout 构造动作模板
+    # First-run safety: use a rig, keep emergency stop reachable, and clear the area.
+    # Zero target/gains/feed-forward torque below only demonstrate communication and
+    # observation. They are not a balancing controller. A real closed loop must
+    # initialize targets from the current posture and use validated damping, gains,
+    # and torque policies.
     action = sdk.MotorCtrlAction()
     motors = []
     for mi in layout.motors:
@@ -153,7 +145,6 @@ with sdk.MotionLowLevelClient() as client:
     cmd.ac_name = "standing"
     client.send_control(action, cmd)
 
-    # 拉取观测量
     obs = client.get_latest_observation(timeout_ms=5)
     if obs is not None:
         print(f"imu accel.z={obs.imu.accel.z:.2f}  motor[0].pos={obs.motors[0].position:.3f}")
@@ -161,15 +152,15 @@ with sdk.MotionLowLevelClient() as client:
     client.set_motion_enable(False)
 ```
 
-动作相关控制帧建议同时携带 `LowLevelMotionCmd`：例如站立使用 `action = 1`、`ac_name = "standing"`，其它动作按对应的 action id 和动作名填写，便于服务端理解和外部观测。
+Action-related control frames should also carry a `LowLevelMotionCmd`. For example, standing uses `action = 1` and `ac_name = "standing"`. Use the corresponding action ID and name for other actions so that the server and external observers can interpret the frame.
 
-`MotionLowLevelClient.send_max_torque(action)` 可设置各电机最大扭矩。该接口只在 `kPrepared` 生效，使用 `action.motors[i].limb_no` / `joint_no` 定位电机、`torque` 携带目标上限；它是低频配置接口，不应放入高频 `send_control()` 控制循环。构建和运行 Python native 模块时，binding、公开头和 `librobotMotionSdk.so` 必须来自同一套 SDK。
+`MotionLowLevelClient.send_max_torque(action)` sets each motor's maximum torque. It is effective only in `kPrepared`; it identifies motors with `action.motors[i].limb_no` / `joint_no` and carries the target limit in `torque`. This is a low-frequency configuration interface and must not be placed in the high-frequency `send_control()` loop. When building and running the Python native module, the binding, public headers, and `librobotMotionSdk.so` must all come from the same SDK delivery.
 
 ### HighLevel
 
-完整示例是交互式 CLI，启动后不会自动执行动作。首次连接先使用只读模式：
+The complete example is an interactive CLI and does not execute an action automatically. Use read-only mode for the first connection.
 
-当前设备运行 SDK 程序需要 root 权限。大脑上直接使用系统 Python；按“快速安装”将 Python SDK 安装到系统 Python 后运行：
+SDK programs require root privileges on current devices. Use the system Python directly on the brain board. After installing the Python SDK into system Python as described under Quick Installation, run:
 
 ```bash
 sudo env \
@@ -177,7 +168,7 @@ sudo env \
   python3 examples/example_highlevel.py --read-only
 ```
 
-进入 `highlevel>` 后可用 `status`、`motors`、`sensor 5`、`odom 5` 做只读检查；需要控制时再输入 `take`、`start`、`set`、`send`、`zero`、`stop` 和 `release`。例如限时前进：
+At the `highlevel>` prompt, use `status`, `motors`, `sensor 5`, and `odom 5` for read-only checks. When control is needed, enter `take`, `start`, `set`, `send`, `zero`, `stop`, and `release`. For example, to move forward for a bounded duration:
 
 ```text
 highlevel> take
@@ -188,13 +179,13 @@ highlevel> release
 highlevel> quit
 ```
 
-底层 API 的最小调用方式如下：
+The minimal lower-level API usage is:
 
 ```python
 import time
 import robot_motion_sdk as sdk
 
-sdk.service.set_network_interface("eth0")    # 远端/多设备时需要；板内忽略
+sdk.service.set_network_interface("eth0")    # required remotely/multi-device; ignored on-board
 sdk.service.initial(None, "myApp")
 
 with sdk.MotionHighLevelClient() as client:
@@ -214,52 +205,52 @@ with sdk.MotionHighLevelClient() as client:
     client.release_control()
 ```
 
-首次真实机器人联调建议只执行 `stand_up()` / `lie_down()`；`walking` / `move()` / `bipedStand` / `handstand` / `jump*` / `damp()` 属于高风险运动动作，应在空旷场地和人工接管条件下执行。
+For initial hardware integration, execute only `stand_up()` / `lie_down()`. `walking` / `move()` / `bipedStand` / `handstand` / `jump*` / `damp()` are high-risk motions and require a clear area with a human ready to intervene.
 
-更多见 `examples/`。
+See `examples/` for more.
 
-示例作为可阅读、可修改的源码随仓库维护，不随 wheel 安装；安装后的业务程序只依赖 `robot_motion_sdk` 包。
+Examples are readable, editable source maintained with the repository and are not installed with the wheel. An installed application depends only on the `robot_motion_sdk` package.
 
-## 3. 完整文档
+## 3. Complete Documentation
 
-- 本仓运行注意事项：[`docs/runtime_notes.md`](docs/runtime_notes.md)
-- 文档总站：[`uniubi-docs`](https://github.com/uniubi-ai/uniubi-docs)
-- Python / C++ 接口映射：[`docs/uniubi_high_level_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_high_level_sdk.md)
-- 低级控制：[`docs/uniubi_low_level_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_low_level_sdk.md)
-- 媒体总线：[`docs/uniubi_media_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_media_sdk.md)
+- Repository runtime notes: [`docs/runtime_notes.md`](docs/runtime_notes.md)
+- Documentation home: [`uniubi-docs`](https://github.com/uniubi-ai/uniubi-docs)
+- Python / C++ interface mapping: [`docs/uniubi_high_level_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_high_level_sdk.md)
+- Low-level control: [`docs/uniubi_low_level_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_low_level_sdk.md)
+- MediaBus: [`docs/uniubi_media_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_media_sdk.md)
 
-## 4. 设计要点
+## 4. Design Notes
 
-- **回调线程**：`on_connect` 在 SDK 内部线程触发。pybind11 自动处理 GIL，但用户回调内不要阻塞或递归调用 SDK 同步方法。
-- **状态机**：`get_state()` 返回 `LowLevelState` / `HighLevelState` 枚举；动作类接口必须在对应状态下才生效。
-- **错误码**：`get_last_error()` 返回 `LowLevelError` / `HighLevelError` 枚举；分阶段定义（连接 / 运行时 / 用法错误）。
-- **幂等**：`connect()` / `start_control()` / `release_control()` 重复调用安全。
-- **资源**：`with` 语句自动 `disconnect`；Python 对象生命周期结束时也会析构 native 实例。
+- **Callback threads:** `on_connect` runs on an internal SDK thread. pybind11 handles the GIL automatically, but user callbacks must not block or recursively call synchronous SDK methods.
+- **State machine:** `get_state()` returns a `LowLevelState` / `HighLevelState` enum. Action methods take effect only in the corresponding state.
+- **Error codes:** `get_last_error()` returns a `LowLevelError` / `HighLevelError` enum, grouped by connection, runtime, and usage stages.
+- **Idempotency:** repeated `connect()` / `start_control()` / `release_control()` calls are safe.
+- **Resources:** a `with` statement disconnects automatically; destroying the Python object also destroys the native instance.
 
-## 5. 类型映射
+## 5. Type Mapping
 
 | C++ | Python |
 |---|---|
-| `std::string`（JSON） | `dict` / `list` / 标量（自动 `json.dumps` / `json.loads` 互转） |
+| `std::string` (JSON) | `dict` / `list` / scalar, converted automatically with `json.dumps` / `json.loads` |
 | `bool` | `bool` |
 | `int32_t` / `uint32_t` / `uint64_t` | `int` |
-| `std::function<...>` 回调 | `Callable` |
-| `LowLevelState` / `LowLevelError` 等枚举 | `enum.IntEnum`（pybind 生成） |
-| `MotorCtrl` / `MotorCtrlAction` / `LowLevelMotionCmd` / `LowLevelMotionObserved` | 同名 Python 类 |
-| `MotorInfo` / `MotorLayout` | 同名 Python 类（`get_motor_layout()` 返回） |
-| `IMUObserved` / `Vector3f` / `Quaternionf` / `PowerObserved` / `TRCStickFrame` | 同名 Python 类（`obs.imu` / `obs.power` / `obs.trc` 字段） |
-| `SensorObserved` / `GPSFrame` / `GEOGPoint` / `UWBRawObserved` / `MotionOdometry` | 同名 Python 类（HighLevel `get_sensor_observation()` 返回；通过 `sensor.gps` / `sensor.uwb` / `sensor.odom` 读取） |
-| `MediaLayout` | 同名 Python 类（运控 native 模块固定导出） |
-| `VideoFrame` / `AudioFrame` / `EncodedVideoFrame` | 同名 Python 类（仅 `sdk.MEDIA_ENABLED == True` 时导出，仅 `aarch64` 板内本地 `MediaBusClient` 帧订阅回调使用；详见媒体 SDK 手册） |
-| `ButtonDefine` / `AxesDefine` / `GPSSignalLevel` / `GEOGCoordMode` / `UWBPairState` / `MotionControlMode` | 同名 `IntEnum`（按键/摇杆下标、GPS/UWB/坐标系解码用） |
+| `std::function<...>` callback | `Callable` |
+| `LowLevelState` / `LowLevelError` and similar enums | `enum.IntEnum` generated by pybind |
+| `MotorCtrl` / `MotorCtrlAction` / `LowLevelMotionCmd` / `LowLevelMotionObserved` | Python classes with the same names |
+| `MotorInfo` / `MotorLayout` | Python classes with the same names, returned by `get_motor_layout()` |
+| `IMUObserved` / `Vector3f` / `Quaternionf` / `PowerObserved` / `TRCStickFrame` | Same-named classes exposed through `obs.imu` / `obs.power` / `obs.trc` |
+| `SensorObserved` / `GPSFrame` / `GEOGPoint` / `UWBRawObserved` / `MotionOdometry` | Same-named classes returned by HighLevel `get_sensor_observation()` and read through `sensor.gps` / `sensor.uwb` / `sensor.odom` |
+| `MediaLayout` | Same-named Python class always exported by the motion native module |
+| `VideoFrame` / `AudioFrame` / `EncodedVideoFrame` | Same-named classes exported only when `sdk.MEDIA_ENABLED == True`; for local on-board `MediaBusClient` callbacks on `aarch64` only |
+| `ButtonDefine` / `AxesDefine` / `GPSSignalLevel` / `GEOGCoordMode` / `UWBPairState` / `MotionControlMode` | Same-named `IntEnum` types for button/axis indexes and GPS/UWB/coordinate decoding |
 
-## 6. 已知限制
+## 6. Known Limitations
 
-- 不支持 Windows（仅 Linux）
-- 不支持 Python 多解释器嵌入
-- 观测帧 Python 回调（高级 `set_motion_observed_callback`，约 50Hz）受 GIL 影响；低级高频观测请用拉模式 `get_latest_observation()`（≥ 500 Hz）
-- 媒体帧订阅仅支持 `aarch64` 板内本地部署；`x86_64` / `i386` 默认构建为 `sdk.MEDIA_ENABLED == False`，不要调用 `create_media_bus_client()`、`setup()` 或 `start_*_frame()`。运行库包仍需保持同版本、同架构 `.so` 文件成组放置。
+- Windows is not supported; Linux only.
+- Python multi-interpreter embedding is not supported.
+- Python observation callbacks are affected by the GIL. High-level `set_motion_observed_callback` is approximately 50 Hz; for high-frequency Low-level observations use pull mode with `get_latest_observation()` at 500 Hz or above.
+- Media-frame subscription supports only local on-board `aarch64` deployment. `x86_64` / `i386` builds default to `sdk.MEDIA_ENABLED == False`; do not call `create_media_bus_client()`, `setup()`, or `start_*_frame()`. Runtime `.so` files must still remain a matched version and architecture set.
 
-## 7. 许可证
+## 7. License
 
-本仓库中的 UniUbi 原创 Python binding、示例和文档使用 Apache License 2.0。vendored pybind11 按其原始许可证授权。详见 [LICENSE](LICENSE)、[NOTICE](NOTICE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+Original UniUbi Python bindings, examples, and documentation in this repository are licensed under the Apache License 2.0. Vendored pybind11 remains under its original license. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
