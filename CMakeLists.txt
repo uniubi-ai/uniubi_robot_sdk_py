@@ -6,7 +6,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 project(uniubi_robot_motion_sdk_python
-    VERSION 0.1.0
+    VERSION 1.0.0
     LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 14)

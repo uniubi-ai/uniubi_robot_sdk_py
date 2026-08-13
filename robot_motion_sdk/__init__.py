@@ -104,7 +104,7 @@ class _URobotService:
 
     @staticmethod
     def version() -> str:
-        """返回 SDK 版本号（如 "0.1.0"），任意时刻可调，无需先 initial()。"""
+        """返回 SDK 版本号（如 "1.0.0"），任意时刻可调，无需先 initial()。"""
         return _native.MotionSdkService.version()
 
     @staticmethod
