@@ -147,4 +147,4 @@ if not sdk.MEDIA_ENABLED:
 
 运行库必须使用同一交付版本、同一目标架构的一组文件。`librobotMotionSdk.so` 和 `libmediaBus.so` 直接依赖 `libudbus.so` 与 `libubase.so`，四者不能跨版本混用；DDS 库和 iceoryx 库也必须与交付包匹配，否则可能表现为服务超时、初始化失败或订阅无帧。
 
-板内 LowLevel 和 MediaBus 链路依赖共享内存运行环境。如果进程报告没有可写的 iceoryx/RouDi SHM segment，应修正目标设备的运行账号权限或使用设备支持的开发者运行模式，不要通过随意修改系统文件权限来制造“通过”。
+当前设备运行 SDK 程序需要 root 权限；板内 LowLevel 和 MediaBus 链路还依赖受限的共享内存环境。大脑上直接使用系统 `python3`，并按 README 通过 `sudo env` 显式传入 `LD_LIBRARY_PATH`；源码直用模式再额外传入 `PYTHONPATH`。不要通过放宽系统文件或 SHM 权限来绕过要求。

@@ -4,15 +4,20 @@
 
 ```bash
 export UNIUBI_SDK_ROOT=/path/to/uniubi_robot_sdk
-python3 -m pip install ..
+sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
+  python3 -m pip install ..
 export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$(uname -m):${LD_LIBRARY_PATH}"
 ```
 
 示例直接从当前目录运行：
 
 ```bash
-python3 example_highlevel.py --read-only
+sudo env \
+  LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 example_highlevel.py --read-only
 ```
+
+当前设备运行 SDK 示例需要 root 权限。大脑上直接使用系统 Python。上面的安装命令将 SDK 安装到系统 Python；Low-level 和媒体示例也使用相同的 `sudo env LD_LIBRARY_PATH=... python3` 前缀。
 
 | 示例 | 行为 | 实机要求 |
 |---|---|---|

@@ -35,7 +35,8 @@ git clone https://github.com/uniubi-ai/uniubi_robot_sdk.git ~/uniubi_robot_sdk
 git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
 export UNIUBI_SDK_ROOT=~/uniubi_robot_sdk   # 或在命令行加 -Ccmake.define.UNIUBI_SDK_ROOT=...
-pip install .
+sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
+  python3 -m pip install .
 ```
 
 产出标准 wheel，按 Python 版本附 ABI 后缀：
@@ -55,7 +56,8 @@ UNIUBI_SDK_ROOT=~/uniubi_robot_sdk python3 -m pip wheel . -w dist
 git clone https://github.com/uniubi-ai/uniubi_robot_sdk.git ~/uniubi_robot_sdk
 git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
-UNIUBI_SDK_ROOT=~/uniubi_robot_sdk pip install -e .
+sudo -H env UNIUBI_SDK_ROOT=~/uniubi_robot_sdk \
+  python3 -m pip install -e .
 ```
 
 可编辑安装后，修改 Python 包装层即时生效；修改 C++ binding 代码后需要重新安装。
@@ -132,8 +134,12 @@ with sdk.MotionLowLevelClient() as client:
 
 完整示例是交互式 CLI，启动后不会自动执行动作。首次连接先使用只读模式：
 
+当前设备运行 SDK 程序需要 root 权限。大脑上直接使用系统 Python；按“快速安装”将 Python SDK 安装到系统 Python 后运行：
+
 ```bash
-python3 examples/example_highlevel.py --read-only
+sudo env \
+  LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 examples/example_highlevel.py --read-only
 ```
 
 进入 `highlevel>` 后可用 `status`、`motors`、`sensor 5`、`odom 5` 做只读检查；需要控制时再输入 `take`、`start`、`set`、`send`、`zero`、`stop` 和 `release`。例如限时前进：
