@@ -68,6 +68,7 @@ MODEL_TO_SDK = np.asarray(
 )
 DEFAULT_POS_MODEL = DEFAULT_POS_LEG_MAJOR[SDK_TO_MODEL]
 CONTROL_RATE_HZ = 50.0
+SAFE_LAY_MAX_ERROR_RAD = 0.25
 
 
 def _load_cuda_runtime():
@@ -498,8 +499,9 @@ def _print_help() -> None:
   lay                   smoothly return to the laying pose
   obs                   print the latest observation
   state                 print client and control-loop state
+  restore               verify laying, disable LowLevel, restore built-in control, and exit
   help                  show this help
-  quit                  stop sending, disable LowLevel control, and exit
+  quit                  stop sending, disable LowLevel control, and exit without restoring
 """
     )
 
@@ -612,6 +614,40 @@ def main() -> int:
             loop.hold(DEFAULT_POS_LEG_MAJOR)
             posture = "standing"
 
+        def restore_default_motion_control() -> None:
+            if posture != "laying":
+                raise RuntimeError("run lay before restore")
+            loop.pause()
+            obs = client.get_latest_observation(timeout_ms=500)
+            motors = [] if obs is None else list(getattr(obs, "motors", []))
+            if len(motors) != 12:
+                raise RuntimeError("cannot verify laying posture: no complete observation")
+            joint_pos = np.asarray([motor.position for motor in motors], dtype=np.float32)
+            max_error = float(np.max(np.abs(joint_pos - CROUCH_POS_LEG_MAJOR)))
+            if max_error > SAFE_LAY_MAX_ERROR_RAD:
+                raise RuntimeError(
+                    "refusing to restore built-in control: laying posture error "
+                    f"{max_error:.3f} rad exceeds {SAFE_LAY_MAX_ERROR_RAD:.3f} rad"
+                )
+            print(f"[PASS] laying posture verified; max_error={max_error:.3f} rad", flush=True)
+
+            if client.get_state() == sdk.LowLevelState.kPrepared:
+                if not client.set_motion_enable(False):
+                    raise RuntimeError(f"disable rejected: {client.get_last_error()}")
+                if not _wait_lowlevel_state(
+                    client, sdk.LowLevelState.kConnected, 10.0, state_event
+                ):
+                    raise RuntimeError(f"disable timeout: {client.get_last_error()}")
+            if client.get_state() != sdk.LowLevelState.kConnected:
+                raise RuntimeError(
+                    f"restore requires kConnected, got {client.get_state()}"
+                )
+            if not client.restore_motion_control_mode(5000):
+                raise RuntimeError(
+                    f"restore_motion_control_mode failed: {client.get_last_error()}"
+                )
+            print("[PASS] built-in motion control restored", flush=True)
+
         print(f"[PASS] connected; model={onnx_path}; robot starts in laying pose", flush=True)
         _print_help()
 
@@ -669,6 +705,9 @@ def main() -> int:
                     loop.hold(CROUCH_POS_LEG_MAJOR)
                     posture = "laying"
                     print("[PASS] laying", flush=True)
+                elif command_name == "restore":
+                    restore_default_motion_control()
+                    break
                 elif command_name == "obs":
                     obs = client.get_latest_observation(timeout_ms=500)
                     if obs is None:

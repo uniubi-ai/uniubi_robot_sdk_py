@@ -1,11 +1,6 @@
 """
 Motion SDK — Python 包装层
 
-命名风格：遵循 PEP 8 —— 方法 / 参数全部 snake_case。
-对应的 C++ SDK 使用 camelCase，两端语义一一对应（仅风格不同）。
-完整命名映射参见 ``uniubi-docs/docs/uniubi_high_level_sdk.md`` §6.1（高级）
-与 ``uniubi-docs/docs/uniubi_low_level_sdk.md`` §6.1（低级）。
-
 底层调用 pybind11 native 模块（``_uniubi_robot_motion_py_native``，私有，不要直接 import）。
 """
 

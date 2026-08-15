@@ -82,9 +82,27 @@ def read_command(prompt: str) -> Optional[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--iface", default="eth0", help="network interface")
+    parser.add_argument(
+        "--iface",
+        default="eth0.100",
+        help="DDS network interface (board default: eth0.100; external: pass the actual interface)",
+    )
     parser.add_argument("--client-id", default="uniubi-python-highlevel-cli")
-    parser.add_argument("--device-id", default="", help="target robot SN in multi-device mode")
+    parser.add_argument(
+        "--device-id",
+        default="",
+        help="target robot SN (required on external hosts and when SDK reports multi-device)",
+    )
+    parser.add_argument(
+        "--discover",
+        action="store_true",
+        help="list discovered robots before connecting; never selects one automatically",
+    )
+    parser.add_argument(
+        "--discover-only",
+        action="store_true",
+        help="list discovered robots and exit without creating a client",
+    )
     parser.add_argument("--lease-ms", type=int, default=60000)
     parser.add_argument("--discovery-timeout", type=float, default=10.0)
     parser.add_argument(
@@ -93,6 +111,58 @@ def build_parser() -> argparse.ArgumentParser:
         help="connect without acquiring High-level control",
     )
     return parser
+
+
+class DeviceDiscovery:
+    """Collect asynchronous discovery replies, de-duplicated by robot SN."""
+
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+        self._callback_count = 0
+        self._devices: dict[str, str] = {}
+
+    def callback(self, sn: str, info_json: str) -> None:
+        with self._condition:
+            self._callback_count += 1
+            self._devices[sn] = info_json
+            self._condition.notify_all()
+
+    def discover(self) -> dict[str, str]:
+        for attempt in range(2):
+            with self._condition:
+                callbacks_before = self._callback_count
+            if not sdk.service.discover_devices(timeout_ms=5000):
+                raise RuntimeError("discover_devices failed")
+
+            deadline = time.monotonic() + 5.0
+            with self._condition:
+                while not _stopping:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0.0:
+                        break
+                    self._condition.wait(timeout=remaining)
+                received = self._callback_count > callbacks_before
+
+            if received or _stopping:
+                break
+            if attempt == 0:
+                print("[WARN] no discovery callback in 5s; retrying once")
+
+        with self._condition:
+            return dict(self._devices)
+
+
+def print_discovered_devices(devices: dict[str, str]) -> None:
+    if not devices:
+        print("[WARN] no robots discovered")
+        return
+    print(f"[INFO] discovered {len(devices)} robot(s):")
+    for sn in sorted(devices):
+        try:
+            info: Any = json.loads(devices[sn])
+        except (json.JSONDecodeError, TypeError):
+            info = devices[sn]
+        print(f"  SN={sn} info={json.dumps(info, ensure_ascii=False, default=str)}")
 
 
 class HighLevelConsole:
@@ -405,6 +475,11 @@ def main() -> int:
     signal.signal(signal.SIGINT, on_signal)
     signal.signal(signal.SIGTERM, on_signal)
 
+    discovery: Optional[DeviceDiscovery] = None
+    if args.discover or args.discover_only:
+        discovery = DeviceDiscovery()
+        # Discovery and log callbacks, plus the DDS interface, must be set before init.
+        sdk.service.set_discover_callback(discovery.callback)
     sdk.service.set_network_interface(args.iface)
     if not sdk.service.initial(None, args.client_id):
         print("[FAIL] sdk.service.initial", file=sys.stderr)
@@ -414,8 +489,14 @@ def main() -> int:
     console: Optional[HighLevelConsole] = None
     status = 0
     try:
+        if discovery is not None:
+            devices = discovery.discover()
+            print_discovered_devices(devices)
+            if args.discover_only:
+                return 0 if devices else 1
         if sdk.service.is_multi_device() and not args.device_id:
-            raise RuntimeError("multi-device mode requires --device-id SN")
+            suffix = "; choose an SN and rerun with --device-id SN" if discovery else ""
+            raise RuntimeError(f"multi-device mode requires --device-id SN{suffix}")
         client = sdk.MotionHighLevelClient(device_id=args.device_id)
         console = HighLevelConsole(client)
         console.connect(args.lease_ms, args.discovery_timeout, args.read_only)

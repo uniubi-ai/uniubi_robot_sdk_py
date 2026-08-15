@@ -1,8 +1,8 @@
-# Runtime Notes
+# Troubleshooting
 
-[中文文档](runtime_notes.zh-CN.md)
+[中文文档](troubleshooting.zh-CN.md)
 
-This document records runtime behaviors that commonly cause integration mistakes in the Python SDK. Complete interface documentation is maintained in [uniubi-docs](https://github.com/uniubi-ai/uniubi-docs).
+This document describes common Python SDK integration problems and the checks or handling steps for them. Complete interface documentation is maintained in [uniubi-docs](https://github.com/uniubi-ai/uniubi-docs).
 
 ## HighLevel Actions Are Asynchronous
 
@@ -51,7 +51,7 @@ A `True` return only means that the configuration frame was submitted to shared 
 
 `MediaBusClient` provides local, on-board media-frame subscription on `aarch64`. Remote or multi-device SDK mode does not provide MediaBus frame subscription. On `x86_64` / `i386`, do not call `create_media_bus_client()`, `setup()`, or `start_*_frame()`.
 
-The 2026-07-03 SDK Python native binding uses `UNIUBI_SDK_ENABLE_MEDIA` to control media-frame bindings. When unspecified, it defaults to enabled on `aarch64` and disabled on `x86_64` / `i386`. Check at runtime:
+The SDK Python native binding uses `UNIUBI_SDK_ENABLE_MEDIA` to control media-frame bindings. When unspecified, it defaults to enabled on `aarch64` and disabled on `x86_64` / `i386`. Check at runtime:
 
 ```python
 import robot_motion_sdk as sdk

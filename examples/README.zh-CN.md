@@ -11,7 +11,7 @@ sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
 export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$(uname -m):${LD_LIBRARY_PATH}"
 ```
 
-示例直接从当前目录运行：
+High-level 在大脑板内可直接从当前目录运行，不需要设备 ID：
 
 ```bash
 sudo env \
@@ -19,7 +19,26 @@ sudo env \
   python3 example_highlevel.py --read-only
 ```
 
-当前设备运行 SDK 示例需要 root 权限。大脑上直接使用系统 Python。上面的安装命令将 SDK 安装到系统 Python；Low-level 和媒体示例也使用相同的 `sudo env LD_LIBRARY_PATH=... python3` 前缀。
+High-level 也可在外部 Linux 主机以普通用户运行，此时必须同时指定实际 DDS 网卡和目标机器人 SN；请将 `enp3s0` 替换为连接机器人网络的真实网卡：
+
+```bash
+UNIUBI_IFACE=enp3s0
+env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 example_highlevel.py \
+  --iface "$UNIUBI_IFACE" --device-id ROBOT_SN --read-only
+```
+
+如果不知道 SN，可只发现并列出设备，不建立连接：
+
+```bash
+UNIUBI_IFACE=enp3s0
+env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 example_highlevel.py --iface "$UNIUBI_IFACE" --discover-only
+```
+
+设备 ID（SN）既可在 Uniubi App 的机器人“基础信息”页面直接查看，也可通过 SDK discovery 获取。发现输出包含每个 SN 及其完整的 `info` JSON。多台机器人同时响应且已知目标 IP 时，可将该 IP 与 `network.ether.ipv4Addr`、`network.wlan.ipv4Addr`、`network.hotspot.ipv4Addr`、`network.mobile.ipv4Addr` 对比，筛选出对应 SN。IP 只用于筛选结果；`--device-id` 最终仍必须传 SN。
+
+`--discover` 会先列出设备再继续，但不会自动选择第一条响应。外部主机使用设备寻址，即使只连接一台机器人也必须显式提供 `--device-id`；SDK 报告支持多设备的部署同样需要 `--device-id`。发现回调和网卡均在 SDK 初始化前设置；等待 5 秒无回调时只重试一次。板载示例需要 root 并直接使用系统 Python；如板载需要指定网卡，使用 `eth0.100`。Low-level 和媒体示例仅板内运行，并使用相同的 `sudo env LD_LIBRARY_PATH=... python3` 前缀。
 
 | 示例 | 行为 | 实机要求 |
 |---|---|---|
@@ -95,15 +114,18 @@ sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
 隔离或核分配方案，应改用实际分配给该控制进程的独立核心。
 
 程序连接后不会自动使能或执行策略。实机动作分两阶段验证：首先将机器狗可靠固定在
-安全吊架上，保持四脚完全腾空，只执行 `stand`、`lay`、`quit`；确认姿态、关节方向
+安全吊架上，保持四脚完全腾空，只执行 `stand`、`lay`、`restore`；确认姿态、关节方向
 和急停均正常后，将机器狗放到空旷、平整、无障碍地面，再执行 `stand`、
-`walk 0.5 0 0`、`stop`、`lay`、`quit`。不要在四脚腾空时执行 `walk`；两个阶段都
+`walk 0.5 0 0`、`stop`、`lay`、`restore`。不要在四脚腾空时执行 `walk`；两个阶段都
 必须保持急停可触达并由专人值守。
 
-`quit` 会停止控制线程、关闭 Low-level、断开 SDK 并释放 CUDA buffer。TensorRT 构建
-失败时程序不会初始化 SDK 或连接机器人。
+`restore` 只在内部姿态状态为 laying，并且最新 12 关节观测与趴下目标的最大误差不
+超过 0.25 rad 时继续；随后停止控制线程、调用 `set_motion_enable(False)`、等待
+`kConnected`、调用 `restore_motion_control_mode()` 并检查结果，成功后退出。`quit`
+仍只关闭 Low-level、断开 SDK 并释放 CUDA buffer，不切换默认运控侧。TensorRT
+构建失败时程序不会初始化 SDK 或连接机器人。
 
-`example_highlevel.py` 参考 8 号狗 Orin 上验证过的 `highlevel_sdk_console.py`，保持一个控制 lease 并在 `highlevel>` 提示符中逐条输入命令。首次连接建议：
+`example_highlevel.py` 保持一个控制 lease，并在 `highlevel>` 提示符中逐条输入命令。首次连接建议：
 
 ```text
 highlevel> status

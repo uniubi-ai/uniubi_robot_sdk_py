@@ -2,14 +2,12 @@
 
 [English](README.md)
 
-机器人运控 SDK 的 Python 绑定，基于 pybind11。功能与 C++ SDK 等价；完整接口说明统一维护在 [`uniubi-docs`](https://github.com/uniubi-ai/uniubi-docs)。
+机器人运控 SDK 的 Python 绑定，基于 pybind11。功能与 C++ SDK 等价；完整接口说明见 Python API 文档：[High-level](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/api-reference/python/high-level.zh-CN.md)、[Low-level](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/api-reference/python/low-level.zh-CN.md) 和 [MediaBus](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/api-reference/python/media.zh-CN.md)。
 
 - `service`：全局初始化（一次）
 - `MotionLowLevelClient`：低级控制（关节级；RPC 控制面 + 板内共享内存(SHM) 数据面，仅板内单设备）
 - `MotionHighLevelClient`：高级控制（预置动作、RPC 控制权）
 - `MediaBusClient`：音视频帧订阅（由 `client.create_media_bus_client()` 派生，仅 `aarch64` 板内本地部署支持；详见 [`uniubi-docs/docs/uniubi_media_sdk.zh-CN.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_media_sdk.zh-CN.md)）
-
-**命名风格**：本包遵循 [PEP 8](https://peps.python.org/pep-0008/#function-and-variable-names)，方法 / 参数全部 `snake_case`（`get_state` / `start_control` 等）。C++ SDK 用 `camelCase`，两端**语义一一对应**仅风格不同；详见 [`uniubi-docs/docs/uniubi_high_level_sdk.zh-CN.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_high_level_sdk.zh-CN.md) §6.1（高级）与 [`uniubi-docs/docs/uniubi_low_level_sdk.zh-CN.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_low_level_sdk.zh-CN.md) §6.1（低级）的 C++ ↔ Python 映射表。
 
 ## 1. 快速安装
 
@@ -48,7 +46,7 @@ sudo -H python3 -m pip install 'numpy>=1.26,<2' 'cuda-python>=12.6,<12.7'
 
 ### MediaBus 构建开关
 
-2026-07-03 版 SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定：
+SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定：
 
 - 未显式指定时，`aarch64` 默认 `ON`，`x86_64` / `i386` 默认 `OFF`。
 - `OFF` 构建仍提供 LowLevel / HighLevel 运控接口，但 native 不编译媒体帧绑定，不提供 `MediaBusError` 和 `VideoFrame` / `AudioFrame` / `EncodedVideoFrame` 等媒体帧类型。
@@ -115,7 +113,7 @@ TensorRT 10 + CUDA Python 执行 `[1,45] -> [1,12]` 的 FP32 速度策略，不�
 import time
 import robot_motion_sdk as sdk
 
-sdk.service.set_network_interface("eth0")    # 远端/多设备时需要；板内忽略
+sdk.service.set_network_interface("eth0.100")  # 板内 Low-level 客户端忽略该设置
 sdk.service.initial(None, "myApp")
 
 with sdk.MotionLowLevelClient() as client:
@@ -169,15 +167,40 @@ with sdk.MotionLowLevelClient() as client:
 
 ### HighLevel
 
-完整示例是交互式 CLI，启动后不会自动执行动作。首次连接先使用只读模式：
+High-level 既可在机器人大脑板内运行，也可在外部 Linux 主机运行。完整示例是交互式 CLI，启动后不会自动执行动作。首次连接先使用只读模式。
 
-当前设备运行 SDK 程序需要 root 权限。大脑上直接使用系统 Python；按“快速安装”将 Python SDK 安装到系统 Python 后运行：
+板内运行不需要设备 ID。板载 SDK 程序需要 root 权限；按“快速安装”将 Python SDK 安装到系统 Python 后运行：
 
 ```bash
 sudo env \
   LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
   python3 examples/example_highlevel.py --read-only
 ```
+
+外部 Linux 主机必须显式指定实际 DDS 网卡和目标机器人 SN。外部 High-level 运行本身不要求 root；请将 `enp3s0` 替换为连接机器人网络的真实网卡：
+
+```bash
+UNIUBI_IFACE=enp3s0
+env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 examples/example_highlevel.py \
+  --iface "$UNIUBI_IFACE" --device-id ROBOT_SN --read-only
+```
+
+如果不知道 SN，可仅发现并列出可用机器人，不连接设备：
+
+```bash
+UNIUBI_IFACE=enp3s0
+env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 examples/example_highlevel.py \
+  --iface "$UNIUBI_IFACE" --discover-only
+```
+
+设备 ID（SN）有两种获取方式：
+
+1. 在 Uniubi App 的机器人“基础信息”页面直接查看 SN。
+2. 使用 SDK discovery。示例会输出每个 SN 及其完整的发现 `info` JSON。如果发现结果包含多台机器人且已知目标 IP，可将 IP 与 `network.ether.ipv4Addr`、`network.wlan.ipv4Addr`、`network.hotspot.ipv4Addr`、`network.mobile.ipv4Addr` 对比，筛选出对应 SN。IP 只用于筛选；传给 `--device-id` 的始终是匹配到的 SN，不能传 IP。
+
+`--discover` 会先列出机器人再继续运行，但不会自动连接第一条发现结果。外部主机使用设备寻址，即使只连接一台机器人也必须显式提供 `--device-id`；SDK 报告支持多设备的部署同样需要 `--device-id`。发现回调和 `--iface` 均在 SDK 初始化前设置；5 秒内无回调时，示例只重试一次。
 
 进入 `highlevel>` 后可用 `status`、`motors`、`sensor 5`、`odom 5` 做只读检查；需要控制时再输入 `take`、`start`、`set`、`send`、`zero`、`stop` 和 `release`。例如限时前进：
 
@@ -193,13 +216,17 @@ highlevel> quit
 底层 API 的最小调用方式如下：
 
 ```python
+import os
 import time
 import robot_motion_sdk as sdk
 
-sdk.service.set_network_interface("eth0")    # 远端/多设备时需要；板内忽略
+# 外部 Linux 主机：设置实际网卡和机器人 SN。
+target_sn = "ROBOT_SN"
+sdk.service.set_network_interface(os.environ["UNIUBI_IFACE"])
+# 板内改为 target_sn = ""，通常无需调用 set_network_interface；如需指定则用 "eth0.100"。
 sdk.service.initial(None, "myApp")
 
-with sdk.MotionHighLevelClient() as client:
+with sdk.MotionHighLevelClient(device_id=target_sn) as client:
     if not client.connect() or not client.start_control(timeout_ms=30000):
         raise RuntimeError(f"start control failed: {client.get_last_error()}")
 
@@ -224,7 +251,7 @@ with sdk.MotionHighLevelClient() as client:
 
 ## 3. 完整文档
 
-- 本仓运行注意事项：[`docs/runtime_notes.md`](docs/runtime_notes.md)
+- 故障排查：[`docs/troubleshooting.zh-CN.md`](docs/troubleshooting.zh-CN.md)
 - 文档总站：[`uniubi-docs`](https://github.com/uniubi-ai/uniubi-docs)
 - Python / C++ 接口映射：[`docs/uniubi_high_level_sdk.zh-CN.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_high_level_sdk.zh-CN.md)
 - 低级控制：[`docs/uniubi_low_level_sdk.zh-CN.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_low_level_sdk.zh-CN.md)

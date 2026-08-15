@@ -2,14 +2,12 @@
 
 [中文文档](README.zh-CN.md)
 
-Python bindings for the robot motion-control SDK, built with pybind11. They provide the same capabilities as the C++ SDK. Complete interface documentation is maintained in [`uniubi-docs`](https://github.com/uniubi-ai/uniubi-docs).
+Python bindings for the robot motion-control SDK, built with pybind11. They provide the same capabilities as the C++ SDK. See the Python API references for [High-level](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/api-reference/python/high-level.md), [Low-level](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/api-reference/python/low-level.md), and [MediaBus](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/api-reference/python/media.md).
 
 - `service`: one-time global initialization
 - `MotionLowLevelClient`: joint-level control; RPC control plane plus on-board shared-memory (SHM) data plane; local single-device only
 - `MotionHighLevelClient`: built-in actions and RPC control ownership
 - `MediaBusClient`: audio/video frame subscription, created with `client.create_media_bus_client()`; local on-board `aarch64` only; see [`uniubi-docs/docs/uniubi_media_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_media_sdk.md)
-
-**Naming:** this package follows [PEP 8](https://peps.python.org/pep-0008/#function-and-variable-names). Methods and parameters use `snake_case`, such as `get_state` and `start_control`. The C++ SDK uses `camelCase`; the semantics correspond one-to-one. See section 6.1 of the [High-level SDK](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_high_level_sdk.md) and [Low-level SDK](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_low_level_sdk.md) documentation for C++ ↔ Python mappings.
 
 ## 1. Quick Installation
 
@@ -43,7 +41,7 @@ This runtime path does not depend on PyTorch, TorchVision, ONNX Runtime, or cuSP
 
 ### MediaBus build switch
 
-The 2026-07-03 SDK Python native binding uses `UNIUBI_SDK_ENABLE_MEDIA` to control media-frame bindings:
+The SDK Python native binding uses `UNIUBI_SDK_ENABLE_MEDIA` to control media-frame bindings:
 
 - When unspecified, it defaults to `ON` on `aarch64` and `OFF` on `x86_64` / `i386`.
 - An `OFF` build still provides LowLevel and HighLevel motion interfaces, but does not compile media-frame bindings or expose `MediaBusError`, `VideoFrame`, `AudioFrame`, or `EncodedVideoFrame`.
@@ -104,7 +102,7 @@ On the board, pinning the process to CPU 2 with `taskset -c 2` is recommended to
 import time
 import robot_motion_sdk as sdk
 
-sdk.service.set_network_interface("eth0")    # required remotely/multi-device; ignored on-board
+sdk.service.set_network_interface("eth0.100")  # ignored by the on-board Low-level client
 sdk.service.initial(None, "myApp")
 
 with sdk.MotionLowLevelClient() as client:
@@ -158,15 +156,40 @@ Action-related control frames should also carry a `LowLevelMotionCmd`. For examp
 
 ### HighLevel
 
-The complete example is an interactive CLI and does not execute an action automatically. Use read-only mode for the first connection.
+High-level control can run either on the robot's brain board or on an external Linux host. The complete example is an interactive CLI and does not execute an action automatically. Use read-only mode for the first connection.
 
-SDK programs require root privileges on current devices. Use the system Python directly on the brain board. After installing the Python SDK into system Python as described under Quick Installation, run:
+On the brain board, no device ID is needed. Board-side SDK programs require root privileges; use the system Python after installing the SDK as described under Quick Installation:
 
 ```bash
 sudo env \
   LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
   python3 examples/example_highlevel.py --read-only
 ```
+
+On an external Linux host, select the actual DDS network interface and the target robot SN explicitly. External High-level use does not inherently require root; replace `enp3s0` with the interface connected to the robot network:
+
+```bash
+UNIUBI_IFACE=enp3s0
+env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 examples/example_highlevel.py \
+  --iface "$UNIUBI_IFACE" --device-id ROBOT_SN --read-only
+```
+
+If the SN is unknown, discovery can list the available robots without selecting one:
+
+```bash
+UNIUBI_IFACE=enp3s0
+env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 examples/example_highlevel.py \
+  --iface "$UNIUBI_IFACE" --discover-only
+```
+
+There are two supported ways to obtain the device ID (SN):
+
+1. Open the robot's **Basic Information** page in the Uniubi App and read the SN directly.
+2. Run SDK discovery. The example prints each SN together with its complete discovery `info` JSON. If discovery returns multiple robots and the target IP address is already known, compare it with `network.ether.ipv4Addr`, `network.wlan.ipv4Addr`, `network.hotspot.ipv4Addr`, and `network.mobile.ipv4Addr` to identify the matching SN. The IP address is only a filter; always pass the matched SN, not the IP address, to `--device-id`.
+
+`--discover` lists robots and then continues, but never connects to the first reply automatically. An external host uses device addressing and must receive an explicit `--device-id` even when only one robot is connected. A deployment for which the SDK reports multi-device support also requires `--device-id`. The discovery callback and `--iface` are configured before SDK initialization. If no callback arrives within 5 seconds, the example retries discovery once.
 
 At the `highlevel>` prompt, use `status`, `motors`, `sensor 5`, and `odom 5` for read-only checks. When control is needed, enter `take`, `start`, `set`, `send`, `zero`, `stop`, and `release`. For example, to move forward for a bounded duration:
 
@@ -182,13 +205,18 @@ highlevel> quit
 The minimal lower-level API usage is:
 
 ```python
+import os
 import time
 import robot_motion_sdk as sdk
 
-sdk.service.set_network_interface("eth0")    # required remotely/multi-device; ignored on-board
+# External Linux: use the actual interface and robot SN.
+target_sn = "ROBOT_SN"
+sdk.service.set_network_interface(os.environ["UNIUBI_IFACE"])
+# On-board instead: target_sn = ""; set_network_interface is normally not required.
+# If board-side interface selection is needed, use "eth0.100".
 sdk.service.initial(None, "myApp")
 
-with sdk.MotionHighLevelClient() as client:
+with sdk.MotionHighLevelClient(device_id=target_sn) as client:
     if not client.connect() or not client.start_control(timeout_ms=30000):
         raise RuntimeError(f"start control failed: {client.get_last_error()}")
 
@@ -213,7 +241,7 @@ Examples are readable, editable source maintained with the repository and are no
 
 ## 3. Complete Documentation
 
-- Repository runtime notes: [`docs/runtime_notes.md`](docs/runtime_notes.md)
+- Troubleshooting: [`docs/troubleshooting.md`](docs/troubleshooting.md)
 - Documentation home: [`uniubi-docs`](https://github.com/uniubi-ai/uniubi-docs)
 - Python / C++ interface mapping: [`docs/uniubi_high_level_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_high_level_sdk.md)
 - Low-level control: [`docs/uniubi_low_level_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_low_level_sdk.md)

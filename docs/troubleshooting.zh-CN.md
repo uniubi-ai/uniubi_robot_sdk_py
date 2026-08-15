@@ -1,8 +1,8 @@
-# 运行注意事项
+# 故障排查
 
-[English](runtime_notes.md)
+[English](troubleshooting.md)
 
-本文记录 Python SDK 接入时容易踩坑的运行行为。完整接口说明统一维护在 [uniubi-docs](https://github.com/uniubi-ai/uniubi-docs)。
+本文汇总 Python SDK 接入中的常见问题、原因及检查或处理方法。完整接口说明统一维护在 [uniubi-docs](https://github.com/uniubi-ai/uniubi-docs)。
 
 ## HighLevel 动作是异步的
 
@@ -51,7 +51,7 @@
 
 `MediaBusClient` 用于 `aarch64` 板内本地媒体帧订阅。远端 / 多设备 SDK 模式不提供 MediaBus 帧订阅；`x86_64` / `i386` 平台不要调用 `create_media_bus_client()`、`setup()` 或 `start_*_frame()`。
 
-2026-07-03 版 SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定。未显式指定时，`aarch64` 默认开启，`x86_64` / `i386` 默认关闭。运行时先检查：
+SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定。未显式指定时，`aarch64` 默认开启，`x86_64` / `i386` 默认关闭。运行时先检查：
 
 ```python
 import robot_motion_sdk as sdk

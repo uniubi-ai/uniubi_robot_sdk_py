@@ -11,7 +11,7 @@ sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
 export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$(uname -m):${LD_LIBRARY_PATH}"
 ```
 
-Run examples directly from this directory:
+Run High-level directly on the brain board; no device ID is needed:
 
 ```bash
 sudo env \
@@ -19,7 +19,26 @@ sudo env \
   python3 example_highlevel.py --read-only
 ```
 
-SDK examples require root privileges on current devices. Use the system Python directly on the brain board. The installation command above installs the SDK into system Python; Low-level and media examples use the same `sudo env LD_LIBRARY_PATH=... python3` prefix.
+High-level can also run on an external Linux host without inherently requiring root. Pass both the actual DDS interface and the target robot SN; replace `enp3s0` with the interface connected to the robot network:
+
+```bash
+UNIUBI_IFACE=enp3s0
+env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 example_highlevel.py \
+  --iface "$UNIUBI_IFACE" --device-id ROBOT_SN --read-only
+```
+
+To find the SN, list devices without connecting:
+
+```bash
+UNIUBI_IFACE=enp3s0
+env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 example_highlevel.py --iface "$UNIUBI_IFACE" --discover-only
+```
+
+Obtain the device ID (SN) either from the robot's **Basic Information** page in the Uniubi App or through SDK discovery. Discovery output includes each SN and its complete `info` JSON. When several robots reply and the target IP is known, compare that IP with `network.ether.ipv4Addr`, `network.wlan.ipv4Addr`, `network.hotspot.ipv4Addr`, and `network.mobile.ipv4Addr` to find the corresponding SN. Use the IP only to filter the results; `--device-id` must still receive the SN.
+
+`--discover` lists devices before continuing, but never selects the first response. An external host uses device addressing and requires `--device-id` even when only one robot is connected. A deployment for which the SDK reports multi-device support also requires `--device-id`. The callback and interface are installed before SDK initialization; discovery waits 5 seconds and retries once only when no callback arrives. Board-side examples require root and use the system Python; if board-side interface selection is needed, use `eth0.100`. Low-level and media examples are board-local and use the same `sudo env LD_LIBRARY_PATH=... python3` prefix.
 
 | Example | Behavior | Hardware requirements |
 |---|---|---|
@@ -82,11 +101,11 @@ sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
 
 On the board, pinning the Low-level control process to CPU 2 with `taskset -c 2` is recommended to reduce scheduler jitter and stabilize observation latency and the 50 Hz control period. If the target device already uses a different CPU isolation or allocation plan, use the isolated core assigned to the control process instead.
 
-The program does not automatically enable control or execute the policy after connecting. Validate hardware motion in two stages. First secure the robot on a safety rig with all four feet fully clear, and execute only `stand`, `lay`, and `quit`. After confirming posture, joint directions, and emergency stop operation, place the robot on clear, level, obstacle-free ground and execute `stand`, `walk 0.5 0 0`, `stop`, `lay`, and `quit`. Do not execute `walk` while all four feet are suspended. During both stages, keep the emergency stop within reach and have a dedicated operator attend the robot.
+The program does not automatically enable control or execute the policy after connecting. Validate hardware motion in two stages. First secure the robot on a safety rig with all four feet fully clear, and execute only `stand`, `lay`, and `restore`. After confirming posture, joint directions, and emergency stop operation, place the robot on clear, level, obstacle-free ground and execute `stand`, `walk 0.5 0 0`, `stop`, `lay`, and `restore`. Do not execute `walk` while all four feet are suspended. During both stages, keep the emergency stop within reach and have a dedicated operator attend the robot.
 
-`quit` stops the control thread, disables Low-level control, disconnects the SDK, and releases CUDA buffers. If the TensorRT build fails, the program does not initialize the SDK or connect to the robot.
+`restore` continues only when the internal posture state is laying and the latest 12-joint observation is within 0.25 rad of the laying target. It then stops the control loop, calls `set_motion_enable(False)`, waits for `kConnected`, calls and checks `restore_motion_control_mode()`, and exits after success. `quit` still only disables Low-level control, disconnects the SDK, and releases CUDA buffers without changing the default motion-control side. If the TensorRT build fails, the program does not initialize the SDK or connect to the robot.
 
-`example_highlevel.py` follows the `highlevel_sdk_console.py` flow validated on dog 08's Orin. It keeps one control lease and accepts commands one at a time at the `highlevel>` prompt. Recommended first connection:
+`example_highlevel.py` keeps one control lease and accepts commands one at a time at the `highlevel>` prompt. Recommended first connection:
 
 ```text
 highlevel> status
