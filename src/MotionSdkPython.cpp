@@ -88,7 +88,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
         .def_static("instance", &IMotionSdkService::instance,
                     py::return_value_policy::reference)
         .def("initial_service", &IMotionSdkService::initialService,
-             py::arg("file"), py::arg("server"), py::arg("timeout") = 30,
+             py::arg("file"), py::arg("server"), py::arg("timeout_ms") = 30000,
              py::call_guard<py::gil_scoped_release>())
         .def("set_log_callback", [](IMotionSdkService& self, py::function cb) {
                 PyCallback callback = makePyCallback(std::move(cb));
@@ -514,7 +514,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
              py::call_guard<py::gil_scoped_release>())
         .def("get_state",    &IMotionLowLevelClient::getState)
         .def("get_last_error", &IMotionLowLevelClient::getLastError)
-        .def("emergency_stop", &IMotionLowLevelClient::emergencyStop, py::arg("timeout") = 5000,
+        .def("emergency_stop", &IMotionLowLevelClient::emergencyStop, py::arg("timeout_ms") = 5000,
              py::call_guard<py::gil_scoped_release>())
         .def("set_motion_enable", &IMotionLowLevelClient::setMotionEnable, py::arg("enable"))
         .def("send_control", [](IMotionLowLevelClient& self, const MotorCtrlAction& action, const LowLevelMotionCmd* cmd) {
@@ -539,7 +539,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return py::cast(obs);
-            }, py::arg("timeout") = 5)
+            }, py::arg("timeout_ms") = 5)
         .def("get_sensor_observation",[](IMotionLowLevelClient& self, uint32_t timeout) -> py::object {
                 SensorObserved sensor = {};
                 bool ok;
@@ -549,7 +549,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return py::cast(sensor);
-            }, py::arg("timeout") = 5000)
+            }, py::arg("timeout_ms") = 5)
         .def("get_motor_layout",[](IMotionLowLevelClient& self, uint32_t timeout) -> py::object {
                 MotorLayout layout = {};
                 bool ok;
@@ -559,7 +559,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return py::cast(layout);
-            }, py::arg("timeout") = 5000)
+            }, py::arg("timeout_ms") = 5000)
         .def("set_connect_callback",[](IMotionLowLevelClient& self, py::function cb) {
                 PyCallback callback = makePyCallback(std::move(cb));
                 self.setConnectCallback([callback](IMotionLowLevelClient::LowLevelState state, IMotionLowLevelClient::LowLevelError err) {
@@ -568,7 +568,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 });
             })
         .def("restore_motion_control_mode", &IMotionLowLevelClient::restoreMotionControlMode,
-             py::arg("timeout") = 5000, py::call_guard<py::gil_scoped_release>())
+             py::arg("timeout_ms") = 5000, py::call_guard<py::gil_scoped_release>())
         ;
 
     /// ───────────────────────────────────────────────────────
@@ -608,7 +608,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
              py::call_guard<py::gil_scoped_release>())
         .def("get_state",       &IMotionHighLevelClient::getState)
         .def("get_last_error",  &IMotionHighLevelClient::getLastError)
-        .def("start_control",   &IMotionHighLevelClient::startControl, py::arg("timeout") = 10000,
+        .def("start_control",   &IMotionHighLevelClient::startControl, py::arg("timeout_ms") = 10000,
              py::call_guard<py::gil_scoped_release>())
         .def("release_control", &IMotionHighLevelClient::releaseControl,
              py::call_guard<py::gil_scoped_release>())
@@ -620,20 +620,20 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
             })
 #endif
         /// ── 动作 ──
-        .def("emergency_stop",  &IMotionHighLevelClient::emergencyStop, py::arg("timeout") = 5000,
+        .def("emergency_stop",  &IMotionHighLevelClient::emergencyStop, py::arg("timeout_ms") = 5000,
              py::call_guard<py::gil_scoped_release>())
-        .def("recovery_stand",  &IMotionHighLevelClient::recoveryStand, py::arg("timeout") = 5000,
+        .def("recovery_stand",  &IMotionHighLevelClient::recoveryStand, py::arg("timeout_ms") = 5000,
              py::call_guard<py::gil_scoped_release>())
-        .def("stop_action",     &IMotionHighLevelClient::stopAction, py::arg("timeout") = 5000,
+        .def("stop_action",     &IMotionHighLevelClient::stopAction, py::arg("timeout_ms") = 5000,
              py::call_guard<py::gil_scoped_release>())
-        .def("damp",            &IMotionHighLevelClient::damp, py::arg("timeout") = 5000,
+        .def("damp",            &IMotionHighLevelClient::damp, py::arg("timeout_ms") = 5000,
              py::call_guard<py::gil_scoped_release>())
-        .def("stand_up",        &IMotionHighLevelClient::standUp, py::arg("timeout") = 5000,
+        .def("stand_up",        &IMotionHighLevelClient::standUp, py::arg("timeout_ms") = 5000,
              py::call_guard<py::gil_scoped_release>())
-        .def("lie_down",        &IMotionHighLevelClient::lieDown, py::arg("timeout") = 5000,
+        .def("lie_down",        &IMotionHighLevelClient::lieDown, py::arg("timeout_ms") = 5000,
              py::call_guard<py::gil_scoped_release>())
         .def("move",            &IMotionHighLevelClient::move,
-             py::arg("vx"), py::arg("vy"), py::arg("vyaw"), py::arg("timeout") = 5000,
+             py::arg("vx"), py::arg("vy"), py::arg("vyaw"), py::arg("timeout_ms") = 5000,
              py::call_guard<py::gil_scoped_release>())
         .def("start_action",
             [](IMotionHighLevelClient& self, const std::string& action, py::object params, uint32_t timeout) {
@@ -641,12 +641,12 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 py::gil_scoped_release rel;
                 return self.startAction(action, js, timeout);
             },
-            py::arg("action"), py::arg("params") = py::none(), py::arg("timeout") = 5000)
+            py::arg("action"), py::arg("params") = py::none(), py::arg("timeout_ms") = 5000)
         .def("set_action_params",[](IMotionHighLevelClient& self, py::object params, uint32_t timeout) {
                 std::string js = pyToJsonString(params);
                 py::gil_scoped_release rel;
                 return self.setActionParams(js, timeout);
-            },py::arg("params") = py::none(), py::arg("timeout") = 5000)
+            },py::arg("params") = py::none(), py::arg("timeout_ms") = 5000)
         /// ── 查询 ──
         .def("query_motion_state",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 std::string out;
@@ -657,7 +657,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return jsonStringToPy(out);
-            },py::arg("timeout") = 5000)
+            },py::arg("timeout_ms") = 5000)
         .def("get_motion_capabilities",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 std::string out;
                 bool ok;
@@ -667,7 +667,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return jsonStringToPy(out);
-            },py::arg("timeout") = 5000)
+            },py::arg("timeout_ms") = 5000)
         .def("query_system_status",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 std::string out;
                 bool ok;
@@ -677,7 +677,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return jsonStringToPy(out);
-            },py::arg("timeout") = 5000)
+            },py::arg("timeout_ms") = 5000)
         .def("get_motor_layout",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 MotorLayout layout = {};
                 bool ok;
@@ -687,7 +687,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return py::cast(layout);
-            }, py::arg("timeout") = 5000)
+            }, py::arg("timeout_ms") = 5000)
         /// ── 观测量数据面 ──
         .def("set_observed_enable",[](IMotionHighLevelClient& self, py::object params, uint32_t timeout) -> py::object {
                 std::string js = pyToJsonString(params);
@@ -699,7 +699,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return jsonStringToPy(ret);
-            }, py::arg("params") = py::none(), py::arg("timeout") = 5000)
+            }, py::arg("params") = py::none(), py::arg("timeout_ms") = 5000)
         .def("get_power_info",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 PowerObserved power = {};
                 bool ok;
@@ -709,7 +709,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return py::cast(power);
-            }, py::arg("timeout") = 5000)
+            }, py::arg("timeout_ms") = 5)
         .def("get_sensor_observation",[](IMotionHighLevelClient& self,uint32_t timeout) -> py::object {
                 SensorObserved sensor{};
                 bool ok;
@@ -719,7 +719,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return py::cast(sensor);
-            },py::arg("timeout") = 5000)
+            },py::arg("timeout_ms") = 5000)
         .def("set_motion_observed_callback",[](IMotionHighLevelClient& self, py::function cb) {
                 PyCallback callback = makePyCallback(std::move(cb));
                 self.setMotionObservedCallback([callback](const LowLevelMotionObserved& obs) {
@@ -739,21 +739,21 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 std::string js = pyToJsonString(params);
                 py::gil_scoped_release rel;
                 return self.startAudioPlay(js, timeout);
-            }, py::arg("params"), py::arg("timeout") = 5000)
-        .def("stop_audio_play",  &IMotionHighLevelClient::stopAudioPlay, py::arg("timeout") = 5000,
+            }, py::arg("params"), py::arg("timeout_ms") = 5000)
+        .def("stop_audio_play",  &IMotionHighLevelClient::stopAudioPlay, py::arg("timeout_ms") = 5000,
              py::call_guard<py::gil_scoped_release>())
-        .def("pause_audio_play", &IMotionHighLevelClient::pauseAudioPlay, py::arg("timeout") = 5000,
+        .def("pause_audio_play", &IMotionHighLevelClient::pauseAudioPlay, py::arg("timeout_ms") = 5000,
              py::call_guard<py::gil_scoped_release>())
         .def("add_audio_file",[](IMotionHighLevelClient& self, py::object params, uint32_t timeout) {
                 std::string js = pyToJsonString(params);
                 py::gil_scoped_release rel;
                 return self.addAudioFile(js, timeout);
-            }, py::arg("params"), py::arg("timeout") = 30000)
+            }, py::arg("params"), py::arg("timeout_ms") = 30000)
         .def("delete_audio_file",[](IMotionHighLevelClient& self, py::object params, uint32_t timeout) {
                 std::string js = pyToJsonString(params);
                 py::gil_scoped_release rel;
                 return self.deleteAudioFile(js, timeout);
-            }, py::arg("params"), py::arg("timeout") = 5000)
+            }, py::arg("params"), py::arg("timeout_ms") = 5000)
         .def("query_audio_play_detail",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 std::string out;
                 bool ok;
@@ -763,7 +763,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return jsonStringToPy(out);
-            }, py::arg("timeout") = 5000)
+            }, py::arg("timeout_ms") = 5000)
         .def("query_audio_play_list",[](IMotionHighLevelClient& self, py::object params, uint32_t timeout) -> py::object {
                 std::string js = pyToJsonString(params);
                 std::string out;
@@ -774,7 +774,7 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return jsonStringToPy(out);
-            }, py::arg("params") = py::none(), py::arg("timeout") = 5000)
+            }, py::arg("params") = py::none(), py::arg("timeout_ms") = 5000)
         .def("get_camera_light_brightness",[](IMotionHighLevelClient& self, uint32_t timeout) -> py::object {
                 std::string out;
                 bool ok;
@@ -784,9 +784,9 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
                 }
                 if (!ok) return py::none();
                 return jsonStringToPy(out);
-            }, py::arg("timeout") = 5000)
+            }, py::arg("timeout_ms") = 5000)
         .def("set_camera_light_brightness", &IMotionHighLevelClient::setCameraLightBrightness,
-             py::arg("brightness"), py::arg("timeout") = 5000,
+             py::arg("brightness"), py::arg("timeout_ms") = 5000,
              py::call_guard<py::gil_scoped_release>())
         /// ── 回调 ──
         .def("set_connect_callback",[](IMotionHighLevelClient& self, py::function cb) {

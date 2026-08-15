@@ -103,11 +103,11 @@ class _URobotService:
         return _native.MotionSdkService.version()
 
     @staticmethod
-    def initial(config_file: str, client_id: str, timeout: int = 30) -> bool:
+    def initial(config_file: str, client_id: str, timeout_ms: int = 30000) -> bool:
         """加载配置 + 初始化 UDBus DDS + RPC 客户端。重复调用返回 True。
-        timeout：等待系统环境就绪的超时（秒，默认 30）；板内模式下 SDK 比系统先起时可能需要等待。
+        timeout_ms：等待系统环境就绪的超时（毫秒，默认 30000）；板内模式下 SDK 比系统先起时可能需要等待。
         """
-        return _native.MotionSdkService.instance().initial_service(config_file, client_id, timeout)
+        return _native.MotionSdkService.instance().initial_service(config_file, client_id, timeout_ms)
 
     @staticmethod
     def set_log_callback(cb: Callable[[LogLevel, str], None]) -> None:
@@ -346,14 +346,14 @@ class MotionLowLevelClient:
         """
         return self._impl.get_latest_observation(timeout_ms)
 
-    def get_sensor_observation(self, timeout_us: int = 5000) -> Optional[SensorObserved]:
+    def get_sensor_observation(self, timeout_ms: int = 5) -> Optional[SensorObserved]:
         """获取最近一帧传感器观测（GPS + UWB），无新数据返回 None。
 
         Args:
-            timeout_us: 阻塞至多 timeout_us（微秒，默认 5000us=5ms）轮询等一帧**新**传感器观测；
-                        窗口内取到则返回，超时返回 None。（注意单位是 us，与 get_power_info 一致）
+            timeout_ms: 阻塞至多 timeout_ms（毫秒，默认 5ms）轮询等一帧**新**传感器观测；
+                        窗口内取到则返回，超时返回 None。（所有 SDK 超时参数均使用 ms）
         """
-        return self._impl.get_sensor_observation(timeout_us)
+        return self._impl.get_sensor_observation(timeout_ms)
 
     def get_motor_layout(self, timeout_ms: int = 5000) -> Optional[MotorLayout]:
         """查询电机硬件布局（kConnected 后即可调用，SDK 内部缓存）。
@@ -537,14 +537,14 @@ class MotionHighLevelClient:
         """
         return self._impl.set_observed_enable(params, timeout_ms)
 
-    def get_power_info(self, timeout_us: int = 5000) -> Optional[PowerObserved]:
+    def get_power_info(self, timeout_ms: int = 5) -> Optional[PowerObserved]:
         """获取电源观测（电量/健康度/温度/充电电流电压）。
 
         Args:
-            timeout_us: 数据新鲜度窗口（微秒）；仅当最近 timeout_us 内有数据才返回，
+            timeout_ms: 数据新鲜度窗口（毫秒）；仅当最近 timeout_ms 内有数据才返回，
                         否则返回 None。
         """
-        return self._impl.get_power_info(timeout_us)
+        return self._impl.get_power_info(timeout_ms)
 
     def get_sensor_observation(self, timeout_ms: int = 5000) -> Optional[SensorObserved]:
         """获取完整传感器观测，包含 GPS、UWB 和 ``odom``。
@@ -657,9 +657,9 @@ def version() -> str:
     return service.version()
 
 
-def initial_service(config_file: str, client_id: str, timeout: int = 30) -> bool:
+def initial_service(config_file: str, client_id: str, timeout_ms: int = 30000) -> bool:
     """初始化 SDK（等价 service.initial）。"""
-    return service.initial(config_file, client_id, timeout)
+    return service.initial(config_file, client_id, timeout_ms)
 
 
 def create_low_level_client() -> MotionLowLevelClient:
