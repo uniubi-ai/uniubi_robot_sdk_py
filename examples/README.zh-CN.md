@@ -44,10 +44,22 @@ env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
 |---|---|---|
 | `example_highlevel.py` | High-level 交互 CLI：状态、传感器/里程计、取权、动作和参数控制 | 启动不自动执行动作；控制命令要求空旷场地、急停可触达、有人值守 |
 | `example_lowlevel.py` | 进入低级控制并周期下发控制帧 | 必须使用吊架，急停可触达 |
+| `release_control_to_dv500.sh` | 启动独立 Python SDK 进程，恢复内置/DV500 运控 | 必须等待原 Low-level 进程完全退出；不使能电机、不发送关节命令 |
 | `example_lowlevel_tensorrt.py` | 在 Orin 上用 TensorRT 执行 45 维观测、12 维动作的 Low-level 策略 | 先做 `--validate-only`；吊架上验证 `stand` / `lay`，空旷平整地面再验证 `walk`；急停可触达 |
 | `example_media_frames.py` | 板内订阅并落盘媒体帧 | 仅 aarch64 且 `sdk.MEDIA_ENABLED` 为真 |
 
 这些文件是面向开发者阅读和修改的源码示例，不随 wheel 安装。它们始终跟随对应 Python SDK 版本维护。
+
+## 独立 Low-level release control
+
+等待原 Low-level 控制进程完全退出后，再以独立进程执行 release control：
+
+```bash
+sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  ./release_control_to_dv500.sh
+```
+
+Python 进程以 50 Hz、server 默认 lease 连接。如果连接后处于 `kPrepared`，会先关闭 Low-level motion 并等待 `kConnected`，随后调用 `restore_motion_control_mode()`、断开 client 并 shutdown SDK service。wrapper 失败后每隔 10 秒启动一个全新的 Python 进程，总预算严格限制为 60 秒。它不会停止或向其他部署进程发送信号；调用者必须先正常结束原 Low-level 程序。
 
 ## Low-level TensorRT 模型示例
 

@@ -44,10 +44,22 @@ Obtain the device ID (SN) either from the robot's **Basic Information** page in 
 |---|---|---|
 | `example_highlevel.py` | Interactive High-level CLI for state, sensors/odometry, ownership, actions, and parameters | Does not execute an action at startup; control commands require a clear area, reachable emergency stop, and attending operator |
 | `example_lowlevel.py` | Enters Low-level control and periodically sends control frames | Safety rig and reachable emergency stop required |
+| `release_control_to_dv500.sh` | Starts a dedicated Python SDK process to restore built-in/DV500 motion control | Run only after the previous Low-level process has completely exited; no motor enable or joint commands |
 | `example_lowlevel_tensorrt.py` | Runs a Low-level policy with 45-dimensional observations and 12-dimensional actions through TensorRT on Orin | Run `--validate-only` first; validate `stand` / `lay` on a rig, then `walk` on clear, level ground; emergency stop reachable |
 | `example_media_frames.py` | Subscribes to and saves on-board media frames | `aarch64` only and `sdk.MEDIA_ENABLED` must be true |
 
 These are readable and editable source examples. They are not installed with the wheel and are maintained with the corresponding Python SDK version.
+
+## Dedicated Low-level release control
+
+After the controlling Low-level process has completely exited, run release control as a separate process:
+
+```bash
+sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  ./release_control_to_dv500.sh
+```
+
+The Python process connects at 50 Hz with the server-default lease. If it encounters a prepared session, it disables Low-level motion and waits for `kConnected`; it then calls `restore_motion_control_mode()`, disconnects, and shuts down the SDK service. The wrapper starts a completely new Python process every 10 seconds after failure and enforces a total 60-second budget. It does not stop or signal another deployment process; the caller must first shut down the previous Low-level program normally.
 
 ## Low-level TensorRT Model Example
 
