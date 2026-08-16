@@ -206,7 +206,7 @@ env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
 
 ```text
 highlevel> take
-highlevel> start walking
+highlevel> start walking {"lineVelocityX":0.0,"lineVelocityY":0.0,"velocity":0.0}
 highlevel> send 3 {"lineVelocityX":0.3,"lineVelocityY":0,"velocity":0}
 highlevel> stop
 highlevel> release
@@ -236,14 +236,26 @@ with sdk.MotionHighLevelClient(device_id=target_sn) as client:
             raise TimeoutError("wait kControlled timeout")
         time.sleep(0.05)
 
-    client.stand_up()
-    time.sleep(5)
+    client.start_action("walking", {
+        "lineVelocityX": 0.0,
+        "lineVelocityY": 0.0,
+        "velocity": 0.0,
+    })
+    time.sleep(3)
+    print(client.query_motion_state())
+    client.stop_action()
     client.lie_down()
     time.sleep(5)
     client.release_control()
 ```
 
-首次真实机器人联调建议只执行 `stand_up()` / `lie_down()`；`walking` / `move()` / `bipedStand` / `handstand` / `jump*` / `damp()` 属于高风险运动动作，应在空旷场地和人工接管条件下执行。
+首次真实机器人联调应先完成只读检查，再以上述三个速度字段均显式为 0 的 `walking` 验证取权、
+动作启动和状态反馈。`stop_action()` 会停止当前动作，将实际动作切回零速 `walking` 并继续保留
+控制权；显式启动三个参数均为 0 的 `walking` 也可以完成同样的动作切换。`set_action_params()`
+下发零值只会修改当前动作参数；`bipedStand`、`handstand` 等动作如果在 capabilities 中暴露速度参数，
+也可以接收这些参数。`stand_up()` / `lie_down()` 受当前姿态和服务端状态机约束，不能
+作为通用的往返测试。带非零速度的 `walking` / `move()`，以及 `bipedStand` / `handstand` / `jump*` /
+`damp()` 属于高风险运动动作，应在空旷场地和人工接管条件下执行。
 
 更多见 `examples/`。
 

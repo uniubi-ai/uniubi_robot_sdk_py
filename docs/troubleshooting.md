@@ -10,7 +10,7 @@ A successful return from `start_action()`, `stand_up()`, or `lie_down()` only me
 
 Use an observation-based closed loop when finishing a test or exiting an application:
 
-1. Call `stop_action()`.
+1. Call `stop_action()`; it returns the effective action to zero-speed `walking` while retaining control. Starting `walking` with full zero parameters is the equivalent explicit transition.
 2. Call `lie_down()` or `start_action("laying")`.
 3. Poll `query_motion_state()` until it returns an empty object (`{}`) or an object containing `"action": "laying"`.
 4. Then call `release_control()`, `disconnect()`, and `sdk.service.shutdown()`.

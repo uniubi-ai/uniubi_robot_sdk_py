@@ -195,7 +195,7 @@ At the `highlevel>` prompt, use `status`, `motors`, `sensor 5`, and `odom 5` for
 
 ```text
 highlevel> take
-highlevel> start walking
+highlevel> start walking {"lineVelocityX":0.0,"lineVelocityY":0.0,"velocity":0.0}
 highlevel> send 3 {"lineVelocityX":0.3,"lineVelocityY":0,"velocity":0}
 highlevel> stop
 highlevel> release
@@ -226,14 +226,20 @@ with sdk.MotionHighLevelClient(device_id=target_sn) as client:
             raise TimeoutError("wait kControlled timeout")
         time.sleep(0.05)
 
-    client.stand_up()
-    time.sleep(5)
+    client.start_action("walking", {
+        "lineVelocityX": 0.0,
+        "lineVelocityY": 0.0,
+        "velocity": 0.0,
+    })
+    time.sleep(3)
+    print(client.query_motion_state())
+    client.stop_action()
     client.lie_down()
     time.sleep(5)
     client.release_control()
 ```
 
-For initial hardware integration, execute only `stand_up()` / `lie_down()`. `walking` / `move()` / `bipedStand` / `handstand` / `jump*` / `damp()` are high-risk motions and require a clear area with a human ready to intervene.
+For initial hardware integration, complete read-only checks first, then use the all-zero `walking` request above to validate ownership, action startup, and status feedback. `stop_action()` stops every current action, returns the effective action to zero-speed `walking`, and retains control; starting `walking` with full zero parameters is the equivalent explicit transition. `set_action_params()` with zero values only changes the current action's parameters, while supported speed parameters can also be updated for actions such as `bipedStand` and `handstand`. `stand_up()` / `lie_down()` depend on the current posture and server state machine, so they are not a universal round-trip test. `walking` / `move()` with nonzero velocity, plus `bipedStand` / `handstand` / `jump*` / `damp()`, are high-risk motions and require a clear area with a human ready to intervene.
 
 See `examples/` for more.
 
