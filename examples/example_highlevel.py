@@ -461,6 +461,7 @@ class HighLevelConsole:
   quit                         clear velocity, release control and exit
 
 Examples:
+  take
   start walking
   send 3 {"lineVelocityX":0.3,"lineVelocityY":0,"velocity":0}
   odom 5
