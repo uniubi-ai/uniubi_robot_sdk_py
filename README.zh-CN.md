@@ -99,6 +99,9 @@ export PYTHONPATH=~/uniubi_robot_sdk_py:$PYTHONPATH
 
 ### LowLevel
 
+Low-level 程序要接入遥控器输入时，遥控器必须处于已连接状态；若已断开，按 `M` 键直到听到
+“遥控器已连接”的语音提示。这个状态是接收遥控器输入的前置条件，不表示退出 Low-level 控制。
+
 基础通信示例见下文；完整的板端模型推理示例见
 [`examples/example_lowlevel_tensorrt.py`](examples/example_lowlevel_tensorrt.py)。后者使用
 TensorRT 10 + CUDA Python 执行 `[1,45] -> [1,12]` 的 FP32 速度策略，不导入 PyTorch。
@@ -204,6 +207,9 @@ env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
 
 真机输入 `take` 申请控制权前，必须先关闭遥控器，或长按遥控器 `M` 键切换，直到听到
 “遥控器连接已断开”的语音提示。遥控器仍连接时，High-level 无法取得控制权；只读命令不要求断开遥控器。
+
+High-level 控制过程中如遇紧急情况，可再次按 `M` 键，直到听到“遥控器已连接”的语音提示，
+再开始使用遥控器接管。
 
 进入 `highlevel>` 后可用 `status`、`motors`、`sensor 5`、`odom 5` 做只读检查；需要控制时再输入 `take`、`start`、`set`、`send`、`zero`、`stop` 和 `release`。例如限时前进：
 
