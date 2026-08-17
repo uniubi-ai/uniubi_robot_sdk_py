@@ -202,6 +202,9 @@ env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
 
 `--discover` 会先列出机器人再继续运行，但不会自动连接第一条发现结果。外部主机使用设备寻址，即使只连接一台机器人也必须显式提供 `--device-id`；SDK 报告支持多设备的部署同样需要 `--device-id`。发现回调和 `--iface` 均在 SDK 初始化前设置；5 秒内无回调时，示例只重试一次。
 
+真机输入 `take` 申请控制权前，必须先关闭遥控器，或长按遥控器 `M` 键切换，直到听到
+“遥控器连接已断开”的语音提示。遥控器仍连接时，High-level 无法取得控制权；只读命令不要求断开遥控器。
+
 进入 `highlevel>` 后可用 `status`、`motors`、`sensor 5`、`odom 5` 做只读检查；需要控制时再输入 `take`、`start`、`set`、`send`、`zero`、`stop` 和 `release`。例如限时前进：
 
 ```text

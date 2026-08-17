@@ -191,6 +191,8 @@ There are two supported ways to obtain the device ID (SN):
 
 `--discover` lists robots and then continues, but never connects to the first reply automatically. An external host uses device addressing and must receive an explicit `--device-id` even when only one robot is connected. A deployment for which the SDK reports multi-device support also requires `--device-id`. The discovery callback and `--iface` are configured before SDK initialization. If no callback arrives within 5 seconds, the example retries discovery once.
 
+Before entering `take` on a real robot, disconnect the remote controller: either power it off, or press and hold its `M` button until the robot announces “遥控器连接已断开” (remote controller disconnected). High-level cannot obtain ownership while the remote controller remains connected. Read-only commands do not require this step.
+
 At the `highlevel>` prompt, use `status`, `motors`, `sensor 5`, and `odom 5` for read-only checks. When control is needed, enter `take`, `start`, `set`, `send`, `zero`, `stop`, and `release`. For example, to move forward for a bounded duration:
 
 ```text
