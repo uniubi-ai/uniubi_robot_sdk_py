@@ -132,4 +132,4 @@ highlevel> release
 highlevel> quit
 ```
 
-`--read-only` only prevents control acquisition at startup; you can still explicitly enter `take` from the CLI. On exit, the program zeros walking velocity, releases control, stops observation, and explicitly calls `disconnect()` rather than relying on Python garbage collection.
+`--read-only` only prevents control acquisition at startup; you can still explicitly enter `take` from the CLI. On exit, the program zeros walking velocity, releases control, stops observation, and explicitly calls `disconnect()` rather than relying on Python garbage collection. This cleanup path does not call `stop_action()` automatically; issue `stop` explicitly before `release` when an action may still be active.

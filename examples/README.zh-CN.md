@@ -152,4 +152,4 @@ highlevel> release
 highlevel> quit
 ```
 
-`--read-only` 只表示启动时不申请控制权，进入 CLI 后仍可显式执行 `take`。程序退出时会清零 walking 速度、释放控制权、关闭观测并显式 `disconnect()`，不会依赖 Python GC 清理。
+`--read-only` 只表示启动时不申请控制权，进入 CLI 后仍可显式执行 `take`。程序退出时会清零 walking 速度、释放控制权、关闭观测并显式 `disconnect()`，不会依赖 Python GC 清理。该清理路径不会自动调用 `stop_action()`；如果动作仍可能处于活动状态，应先显式输入 `stop`，再输入 `release`。
