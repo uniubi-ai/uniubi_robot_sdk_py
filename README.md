@@ -48,6 +48,20 @@ The SDK Python native binding uses `UNIUBI_SDK_ENABLE_MEDIA` to control media-fr
 - At runtime, check `sdk.MEDIA_ENABLED`. When it is `False`, `create_media_bus_client()` raises `RuntimeError("MediaBus is not available in this SDK build")`.
 - Enable media bindings only for local on-board `aarch64` deployment. Do not force-enable them on `x86_64` / `i386` merely to compile and then call media interfaces.
 
+### Before running the MediaBus example
+
+`examples/example_media_frames.py` is not a remote-camera example. It subscribes to media frames locally on the robot's `aarch64` brain board. Before running it, verify all of the following:
+
+- `sdk.MEDIA_ENABLED` is `True` in the Python environment that will run the example.
+- `/etc/robot/sdk_config.json` exists, is readable, and contains a top-level `streamDefine` object.
+- The on-board media service, requested stream channels, and SHM environment are ready.
+- `librobotMotionSdk.so`, `libmediaBus.so`, `libudbus.so`, and `libubase.so` come from the same delivery and are visible through `LD_LIBRARY_PATH`.
+- The example is started as root while preserving `LD_LIBRARY_PATH`.
+
+The optional first argument to `example_media_frames.py` is the Motion SDK service configuration. It does **not** replace `/etc/robot/sdk_config.json`, which the local MediaBus client reads during `media.setup()`.
+
+See [Local MediaBus Configuration](docs/troubleshooting.md#local-mediabus-configuration) for the configuration schema, error mapping, and SHM checks.
+
 ### pip install (recommended for an independent Python project)
 
 ```bash

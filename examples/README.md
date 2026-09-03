@@ -50,6 +50,19 @@ Obtain the device ID (SN) either from the robot's **Basic Information** page in 
 
 These are readable and editable source examples. They are not installed with the wheel and are maintained with the corresponding Python SDK version.
 
+## MediaBus frame example
+
+Before running `example_media_frames.py`, confirm that `/etc/robot/sdk_config.json` is readable and contains a top-level `streamDefine` object, the on-board media service and requested channels are running, and the SHM environment is ready. The example is local to the robot's `aarch64` brain board; it cannot subscribe to robot media from an external host.
+
+The optional `config` argument shown by the script configures the Motion SDK service. It does not replace `/etc/robot/sdk_config.json`, which `media.setup()` always reads. Run the example as root while preserving the matched SDK runtime-library path:
+
+```bash
+sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 example_media_frames.py
+```
+
+If initialization fails, the example prints `MediaBusError` and an actionable hint. See [Python SDK troubleshooting](../docs/troubleshooting.md#local-mediabus-configuration) for the configuration schema and error mapping.
+
 ## Dedicated Low-level release control
 
 After the controlling Low-level process has completely exited, run release control as a separate process:

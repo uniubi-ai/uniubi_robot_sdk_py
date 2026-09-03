@@ -9,9 +9,12 @@ Examples:
   python3 example_media_frames.py - mediaFramePythonExample - 0 0 10 eth0
 
 Media frame subscription is supported only on aarch64 local board deployment.
-The config argument may be omitted or set to "-" to use the SDK built-in
-mediaBusDemo streamDefine. The first 10 frames of each type are saved under
-/tmp/media_frame_dump.
+Before running, verify that /etc/robot/sdk_config.json contains a top-level
+streamDefine object and that the on-board media service, requested channels,
+and SHM environment are ready. The optional config argument configures the
+Motion SDK service; it does not replace /etc/robot/sdk_config.json, which
+MediaBus setup always reads. The first 10 frames of each type are saved under
+/tmp/media_frame_dump. See ../docs/troubleshooting.md for error mapping.
 
 帧订阅统一走 MediaBusClient：先 connect() 一个 LowLevel/High 客户端，
 再 client.create_media_bus_client() 拿到 MediaBusClient，setup() 后即可
@@ -45,6 +48,10 @@ except ImportError:
 
 DUMP_LIMIT = 10
 DUMP_DIR = Path("/tmp/media_frame_dump")
+TROUBLESHOOTING_URL = (
+    "https://github.com/uniubi-ai/uniubi_robot_sdk_py/blob/main/"
+    "docs/troubleshooting.md#local-mediabus-configuration"
+)
 
 _stop = False
 
@@ -123,12 +130,39 @@ def _print_usage(program: str) -> None:
         f"{program} [config|-] [client_id] [device_id|-] "
         "[video_channel] [audio_channel] [seconds] [network_iface|-]"
     )
-    print("       config omitted or '-' uses the SDK built-in mediaBusDemo streamDefine.")
+    print("       config configures the Motion SDK service; '-' uses its defaults.")
+    print("       MediaBus setup always reads /etc/robot/sdk_config.json.")
     print(f"example: {program} - mediaFramePythonExample - 0 0 10 eth0")
 
 
 def _is_aarch64_local_media_target() -> bool:
     return platform.machine().lower() in {"aarch64", "arm64"}
+
+
+def _print_media_setup_failure(media) -> None:
+    if media is None:
+        print("create media bus client failed")
+        print(f"troubleshooting: {TROUBLESHOOTING_URL}")
+        return
+
+    try:
+        error = media.get_last_error()
+    except Exception as exc:  # noqa: BLE001
+        print(f"media.setup() failed; get_last_error() raised: {exc}")
+        print(f"troubleshooting: {TROUBLESHOOTING_URL}")
+        return
+
+    print(f"media.setup() failed: {error}")
+    if error == sdk.MediaBusError.kConfigLoadFailed:
+        print("check that /etc/robot/sdk_config.json exists and is readable")
+    elif error == sdk.MediaBusError.kConfigInvalid:
+        print("check that /etc/robot/sdk_config.json contains a top-level streamDefine object")
+    elif error in {
+        sdk.MediaBusError.kMediaInitFailed,
+        sdk.MediaBusError.kMediaStartFailed,
+    }:
+        print("check the on-board media service, stream channels, matched runtime libraries, and SHM")
+    print(f"troubleshooting: {TROUBLESHOOTING_URL}")
 
 
 def _enum_int(enum_cls, name: str) -> Optional[int]:
@@ -140,9 +174,9 @@ def _enum_int_set(enum_cls, names: List[str]) -> set:
     return {value for value in (_enum_int(enum_cls, name) for name in names) if value is not None}
 
 
-PF = sdk.MediaPixelFormat
-VIDEO_ENCODE = sdk.VideoEncode
-FRAME_TYPE = sdk.FrameType
+PF = getattr(sdk, "MediaPixelFormat", None)
+VIDEO_ENCODE = getattr(sdk, "VideoEncode", None)
+FRAME_TYPE = getattr(sdk, "FrameType", None)
 
 PIXEL_FORMAT_NAMES = {
     _enum_int(PF, "mediaPixelFormatNV12"): "NV12",
@@ -488,6 +522,23 @@ def main() -> int:
 
     options = _parse_args(sys.argv)
     _print_usage(sys.argv[0])
+
+    if not _is_aarch64_local_media_target():
+        print("media frame subscription is only supported on aarch64 local board deployment")
+        return 1
+
+    if not getattr(sdk, "MEDIA_ENABLED", False):
+        print("this Python SDK build does not include MediaBus bindings (sdk.MEDIA_ENABLED=False)")
+        print(f"troubleshooting: {TROUBLESHOOTING_URL}")
+        return 1
+
+    media_config = Path("/etc/robot/sdk_config.json")
+    if not media_config.is_file():
+        print("MediaBus requires /etc/robot/sdk_config.json, but the file was not found")
+        print(f"troubleshooting: {TROUBLESHOOTING_URL}")
+        return 1
+
+    print("MediaBus preflight: aarch64 and Python bindings ready; using /etc/robot/sdk_config.json")
     DUMP_DIR.mkdir(parents=True, exist_ok=True)
     print(f"dump dir: {DUMP_DIR}")
 
@@ -507,12 +558,10 @@ def main() -> int:
     stats = Stats()
 
     try:
-        if not _is_aarch64_local_media_target():
-            print("media frame subscription is only supported on aarch64 local board deployment")
-            return 1
-
         if not sdk.service.initial(options.config_file, options.client_id):
             print("SDK initial failed")
+            print("check root privileges, matched runtime libraries, and the board SHM environment")
+            print(f"troubleshooting: {TROUBLESHOOTING_URL}")
             return 1
 
         # MediaBus 仅支持 aarch64 板内本地部署；多设备/远端模式不提供帧订阅。
@@ -535,8 +584,11 @@ def main() -> int:
             time.sleep(0.05)
 
         media = client.create_media_bus_client()
-        if media is None or not media.setup():
-            print("create/setup media bus client failed")
+        if media is None:
+            _print_media_setup_failure(media)
+            return 1
+        if not media.setup():
+            _print_media_setup_failure(media)
             return 1
 
         layout = media.get_media_layout()
@@ -571,6 +623,16 @@ def main() -> int:
                 break
             time.sleep(1)
             print(f"[tick] {i + 1}/{options.seconds}")
+
+        with stats.lock:
+            total_frames = (
+                stats.video_raw.frames
+                + stats.video_encoded.frames
+                + stats.audio_raw.frames
+            )
+        if total_frames == 0:
+            print("no media frames received; check the media service and requested stream channels")
+            print(f"troubleshooting: {TROUBLESHOOTING_URL}")
 
         return 0
 

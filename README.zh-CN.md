@@ -53,6 +53,20 @@ SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定
 - 运行时可用 `sdk.MEDIA_ENABLED` 判断当前 wheel 是否包含媒体绑定；为 `False` 时调用 `create_media_bus_client()` 会抛出 `RuntimeError("MediaBus is not available in this SDK build")`。
 - 只有 `aarch64` 板内本地部署应开启媒体绑定；不要为了让 `x86_64` / `i386` 编译通过而强行开启后调用媒体接口。
 
+### 运行 MediaBus 示例前
+
+`examples/example_media_frames.py` 不是远程读取摄像头的示例，它只在机器人的 `aarch64` 大脑板内本地订阅媒体帧。运行前必须确认：
+
+- 实际运行示例的 Python 环境中 `sdk.MEDIA_ENABLED` 为 `True`。
+- `/etc/robot/sdk_config.json` 存在、可读，并包含顶层 `streamDefine` 对象。
+- 板内媒体服务、需要订阅的流通道和 SHM 环境已经就绪。
+- `librobotMotionSdk.so`、`libmediaBus.so`、`libudbus.so` 和 `libubase.so` 来自同一交付版本，并可通过 `LD_LIBRARY_PATH` 找到。
+- 使用 root 运行示例，同时保留 `LD_LIBRARY_PATH`。
+
+`example_media_frames.py` 可选的第一个参数是 Motion SDK service 配置，**不能**替代本地 MediaBus client 在 `media.setup()` 阶段固定读取的 `/etc/robot/sdk_config.json`。
+
+配置结构、错误码对应原因和 SHM 检查方法见[MediaBus 本地配置](docs/troubleshooting.zh-CN.md#mediabus-本地配置)。
+
 ### pip install（推荐，独立 Python 项目）
 
 ```bash

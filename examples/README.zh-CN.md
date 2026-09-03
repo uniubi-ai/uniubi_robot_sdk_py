@@ -50,6 +50,19 @@ env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
 
 这些文件是面向开发者阅读和修改的源码示例，不随 wheel 安装。它们始终跟随对应 Python SDK 版本维护。
 
+## MediaBus 帧示例
+
+运行 `example_media_frames.py` 前，需要确认 `/etc/robot/sdk_config.json` 可读且包含顶层 `streamDefine` 对象、板内媒体服务和需要订阅的流通道正在运行，并且 SHM 环境已经就绪。该示例只在机器人的 `aarch64` 大脑板内本地订阅，不能从外部主机远程订阅机器人媒体帧。
+
+脚本说明中的可选 `config` 参数用于配置 Motion SDK service，不能替代 `media.setup()` 固定读取的 `/etc/robot/sdk_config.json`。使用 root 运行示例，并保留同版本 SDK 运行库路径：
+
+```bash
+sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 example_media_frames.py
+```
+
+初始化失败时，示例会打印 `MediaBusError` 和对应的排查提示。配置结构与错误码对应关系见 [Python SDK 故障排查](../docs/troubleshooting.zh-CN.md#mediabus-本地配置)。
+
 ## 独立 Low-level release control
 
 等待原 Low-level 控制进程完全退出后，再以独立进程执行 release control：
