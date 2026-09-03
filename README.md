@@ -261,6 +261,67 @@ with sdk.MotionHighLevelClient(device_id=target_sn) as client:
 
 For initial hardware integration, complete read-only checks first, then use the all-zero `walking` request above to validate ownership, action startup, and status feedback. `stop_action()` stops every current action, returns the effective action to zero-speed `walking`, and retains control; starting `walking` with full zero parameters is the equivalent explicit transition. `set_action_params()` with zero values only changes the current action's parameters, while supported speed parameters can also be updated for actions such as `bipedStand` and `handstand`. `stand_up()` / `lie_down()` depend on the current posture and server state machine, so they are not a universal round-trip test. `walking` / `move()` with nonzero velocity, plus `bipedStand` / `handstand` / `jump*` / `damp()`, are high-risk motions and require a clear area with a human ready to intervene.
 
+### MediaBus
+
+MediaBus subscription runs only on the robot's `aarch64` brain board. Complete the [MediaBus preflight checks](#before-running-the-mediabus-example) first, then run the full example:
+
+```bash
+sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 examples/example_media_frames.py
+```
+
+The example subscribes to raw video, encoded video, and raw audio, prints frame counters, and saves the first 10 frames of each type under `/tmp/media_frame_dump`. It does not request motion-control ownership or send motion commands.
+
+The minimal API lifecycle below subscribes to raw video channel 0 and prints frame metadata. A connected on-board Low-level client is used only to create `MediaBusClient`; `set_motion_enable()` is not required:
+
+```python
+import time
+import robot_motion_sdk as sdk
+
+if not sdk.MEDIA_ENABLED:
+    raise RuntimeError("this Python SDK build does not include MediaBus bindings")
+
+if not sdk.service.initial(None, "mediaQuickStart"):
+    raise RuntimeError("SDK initialization failed")
+
+try:
+    with sdk.MotionLowLevelClient() as client:
+        if not client.connect():
+            raise RuntimeError(f"connect failed: {client.get_last_error()}")
+
+        deadline = time.monotonic() + 5.0
+        while client.get_state() != sdk.LowLevelState.kConnected:
+            if time.monotonic() >= deadline:
+                raise TimeoutError("wait kConnected timeout")
+            time.sleep(0.05)
+
+        media = client.create_media_bus_client()
+        if media is None:
+            raise RuntimeError("create_media_bus_client() failed")
+
+        try:
+            if not media.setup():
+                raise RuntimeError(f"MediaBus setup failed: {media.get_last_error()}")
+
+            def on_video(channel, frame):
+                info = frame.frame_info
+                print(channel, info.width, info.height, frame.size())
+
+            if not media.start_raw_video_frame(0, on_video):
+                raise RuntimeError(f"video subscription failed: {media.get_last_error()}")
+
+            try:
+                time.sleep(10)
+            finally:
+                media.stop_raw_video_frame(0)
+        finally:
+            media.shutdown()
+finally:
+    sdk.service.shutdown()
+```
+
+Frame callbacks run on SDK-managed media threads, so do not block them with expensive work. `frame.data()` returns a `bytes` copy that may be retained, while zero-copy views returned by `frame.plane_view()` / `frame.view()` are valid only during the callback; copy required pixels before handing them to another thread. For plane/stride-safe raw-video saving and audio or encoded-video subscription, use [`examples/example_media_frames.py`](examples/example_media_frames.py). Setup failures and zero-frame cases are covered by [Local MediaBus Configuration](docs/troubleshooting.md#local-mediabus-configuration).
+
 See `examples/` for more.
 
 Examples are readable, editable source maintained with the repository and are not installed with the wheel. An installed application depends only on the `robot_motion_sdk` package.

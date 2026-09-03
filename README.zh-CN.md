@@ -280,6 +280,67 @@ with sdk.MotionHighLevelClient(device_id=target_sn) as client:
 作为通用的往返测试。带非零速度的 `walking` / `move()`，以及 `bipedStand` / `handstand` / `jump*` /
 `damp()` 属于高风险运动动作，应在空旷场地和人工接管条件下执行。
 
+### MediaBus
+
+MediaBus 只能在机器人的 `aarch64` 大脑板内本地订阅。先完成[运行前检查](#运行-mediabus-示例前)，再运行完整示例：
+
+```bash
+sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 examples/example_media_frames.py
+```
+
+该示例订阅原始视频、编码视频和原始音频，持续打印帧计数，并将每种类型的前 10 帧保存到 `/tmp/media_frame_dump`。整个过程不申请运控控制权，也不发送运动指令。
+
+下面的最小 API 示例订阅原始视频通道 0 并打印帧元数据。板内 Low-level client 只用于创建 `MediaBusClient`，不需要调用 `set_motion_enable()`：
+
+```python
+import time
+import robot_motion_sdk as sdk
+
+if not sdk.MEDIA_ENABLED:
+    raise RuntimeError("当前 Python SDK 构建未包含 MediaBus binding")
+
+if not sdk.service.initial(None, "mediaQuickStart"):
+    raise RuntimeError("SDK 初始化失败")
+
+try:
+    with sdk.MotionLowLevelClient() as client:
+        if not client.connect():
+            raise RuntimeError(f"连接失败：{client.get_last_error()}")
+
+        deadline = time.monotonic() + 5.0
+        while client.get_state() != sdk.LowLevelState.kConnected:
+            if time.monotonic() >= deadline:
+                raise TimeoutError("等待 kConnected 超时")
+            time.sleep(0.05)
+
+        media = client.create_media_bus_client()
+        if media is None:
+            raise RuntimeError("create_media_bus_client() 失败")
+
+        try:
+            if not media.setup():
+                raise RuntimeError(f"MediaBus setup 失败：{media.get_last_error()}")
+
+            def on_video(channel, frame):
+                info = frame.frame_info
+                print(channel, info.width, info.height, frame.size())
+
+            if not media.start_raw_video_frame(0, on_video):
+                raise RuntimeError(f"视频订阅失败：{media.get_last_error()}")
+
+            try:
+                time.sleep(10)
+            finally:
+                media.stop_raw_video_frame(0)
+        finally:
+            media.shutdown()
+finally:
+    sdk.service.shutdown()
+```
+
+帧回调运行在 SDK 管理的媒体线程中，不要在回调内执行耗时或阻塞操作。`frame.data()` 返回可跨回调保留的 `bytes` 拷贝；`frame.plane_view()` / `frame.view()` 返回的零拷贝视图只在当前回调内有效，需要交给其他线程时应先复制数据。需要正确处理 plane/stride 的原始视频落盘，或订阅音频、编码视频时，直接使用 [`examples/example_media_frames.py`](examples/example_media_frames.py)。setup 失败或持续零帧的排查方法见 [MediaBus 本地配置](docs/troubleshooting.zh-CN.md#mediabus-本地配置)。
+
 更多见 `examples/`。
 
 示例作为可阅读、可修改的源码随仓库维护，不随 wheel 安装；安装后的业务程序只依赖 `robot_motion_sdk` 包。
