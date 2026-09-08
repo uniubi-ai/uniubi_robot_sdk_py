@@ -13,6 +13,7 @@ Python bindings for the robot motion-control SDK, built with pybind11. They prov
 
 ### Requirements
 
+- The robot version must be **1.01.005 or later**. Upgrade robots running an earlier version before using this SDK.
 - Python 3.8 or later
 - Compiled SDK runtime libraries under `$UNIUBI_SDK_ROOT/lib/<arch>/` or `/opt/uniubi/lib/<arch>/`, where `<arch>` is `x86_64`, `aarch64`, or `i386`:
   - `librobotMotionSdk.so`, `libmediaBus.so`, `libudbus.so`, and `libubase.so` must be delivered as a matched version and architecture set.
