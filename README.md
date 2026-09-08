@@ -329,6 +329,7 @@ Examples are readable, editable source maintained with the repository and are no
 
 ## 3. Complete Documentation
 
+- [Custom audio: upload by URL and play](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/use-media-and-device-io.md#custom-audio-upload-by-url-and-play): serve an HTTP URL from Orin/PC, let DV500 import the file, and wait for its audio ID before playback; includes a complete Python example.
 - Troubleshooting: [`docs/troubleshooting.md`](docs/troubleshooting.md)
 - Documentation home: [`uniubi-docs`](https://github.com/uniubi-ai/uniubi-docs)
 - Python / C++ interface mapping: [`docs/uniubi_high_level_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_high_level_sdk.md)

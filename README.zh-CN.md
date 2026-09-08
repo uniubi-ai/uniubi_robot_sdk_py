@@ -348,6 +348,7 @@ finally:
 
 ## 3. 完整文档
 
+- [自定义音频：通过 URL 上传并播放](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/use-media-and-device-io.zh-CN.md#自定义音频通过-url-上传并播放)：Orin/PC 提供 HTTP URL，DV500 下载入库，等待音频 ID 出现后再播放；包含 Python 完整示例。
 - 故障排查：[`docs/troubleshooting.zh-CN.md`](docs/troubleshooting.zh-CN.md)
 - 文档总站：[`uniubi-docs`](https://github.com/uniubi-ai/uniubi-docs)
 - Python / C++ 接口映射：[`docs/uniubi_high_level_sdk.zh-CN.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_high_level_sdk.zh-CN.md)
