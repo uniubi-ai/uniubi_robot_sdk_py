@@ -8,6 +8,9 @@ Examples:
   python3 example_media_frames.py
   python3 example_media_frames.py - mediaFramePythonExample - 0 0 10 eth0
 
+Use --capture-all <new-output-dir> [seconds=20] [network_iface|-] to save
+five NV21 images from each camera and four 16 kHz / 16-bit / mono PCM streams.
+
 Media frame subscription is supported only on aarch64 local board deployment.
 Before running, verify that /etc/robot/sdk_config.json contains a top-level
 streamDefine object and that the on-board media service, requested channels,
@@ -32,6 +35,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import io
 import platform
 import signal
 import sys
@@ -70,6 +74,7 @@ class Options:
     audio_channel: int = 0
     seconds: int = 10
     network_interface: str = ""
+    capture_dir: Optional[Path] = None
 
 
 @dataclass
@@ -107,6 +112,15 @@ def _parse_int(value: str, fallback: int) -> int:
 
 def _parse_args(argv: List[str]) -> Options:
     options = Options()
+    if len(argv) > 1 and argv[1] in {"--capture-all", "--pcm4"}:
+        if not 3 <= len(argv) <= 5:
+            raise ValueError("capture requires a new output directory, optional seconds and interface")
+        options.capture_dir = Path(argv[2])
+        options.seconds = int(argv[3]) if len(argv) > 3 else 20
+        if not 1 <= options.seconds <= 60:
+            raise ValueError("capture seconds must be in 1..60")
+        options.network_interface = argv[4] if len(argv) > 4 and argv[4] != "-" else ""
+        return options
     if len(argv) > 1 and argv[1] != "-":
         options.config_file = argv[1]
     if len(argv) > 2:
@@ -130,6 +144,8 @@ def _print_usage(program: str) -> None:
         f"{program} [config|-] [client_id] [device_id|-] "
         "[video_channel] [audio_channel] [seconds] [network_iface|-]"
     )
+    print(f"       {program} --capture-all <new-output-dir> [seconds:1..60, default 20] [network_iface|-]")
+    print("       --pcm4 is an alias; saves 5 NV21 images per camera and 4 PCM streams.")
     print("       config configures the Motion SDK service; '-' uses its defaults.")
     print("       MediaBus setup always reads /etc/robot/sdk_config.json.")
     print(f"example: {program} - mediaFramePythonExample - 0 0 10 eth0")
@@ -512,6 +528,130 @@ def _print_summary(stats: Stats) -> None:
     )
 
 
+def _capture_all(media, options: Options) -> bool:
+    """Bounded callback copies; no frame/view survives the callback."""
+    target = options.seconds * 32000
+    pcm = [bytearray() for _ in range(4)]
+    images = [[] for _ in range(2)]
+    last_pts = [None] * 4
+    invalid = [0] * 4
+    duplicates = [0] * 4
+    video_invalid = [0] * 2
+    lock = threading.Lock()
+    accepting = False
+    audio_subscribed, video_subscribed = [], []
+
+    def audio(expected, channel, frame):
+        with lock:
+            if not accepting or len(pcm[expected]) >= target:
+                return
+            try:
+                info = frame.frame_info
+                if (channel != expected or int(info.data_type) != 0 or
+                        int(info.sample_rate) != 16000 or int(info.sample_format) != 16 or
+                        int(info.channel_count) != 1 or frame.size() <= 0 or frame.size() % 2):
+                    invalid[expected] += 1
+                    return
+                pts = int(info.timestamp)
+                if last_pts[expected] is not None and pts <= last_pts[expected]:
+                    duplicates[expected] += 1
+                    return
+                # view() is callback-only; copy only the remaining bounded payload.
+                view = memoryview(frame.view()).cast("B")
+                if len(view) != frame.size():
+                    invalid[expected] += 1
+                    return
+                pcm[expected].extend(view[:target - len(pcm[expected])])
+                last_pts[expected] = pts
+            except Exception as exc:
+                invalid[expected] += 1
+                print(f"[capture-audio] ch={expected}: {exc}")
+
+    def video(expected, channel, frame):
+        with lock:
+            if not accepting or len(images[expected]) >= 5:
+                return
+            try:
+                info = frame.frame_info
+                w, h = int(info.width), int(info.height)
+                if (channel != expected or int(info.pixel_format) != PF_NV21 or
+                        not 0 < w <= 4096 or not 0 < h <= 2160 or w % 2 or h % 2):
+                    video_invalid[expected] += 1
+                    return
+                output = io.BytesIO()
+                if not (_write_plane_rows(output, frame, 0, w, h) and
+                        _write_plane_rows(output, frame, 1, w, h // 2)):
+                    video_invalid[expected] += 1
+                    return
+                name = (f"camera{expected}_{w}x{h}_pts{int(info.timestamp)}_"
+                        f"{len(images[expected]) + 1}.nv21")
+                images[expected].append((name, output.getvalue()))
+            except Exception as exc:
+                video_invalid[expected] += 1
+                print(f"[capture-video] ch={expected}: {exc}")
+
+    ready = True
+    try:
+        for ch in range(4):
+            ok = media.start_raw_audio_frame(ch, lambda channel, frame, ch=ch: audio(ch, channel, frame))
+            if ok:
+                audio_subscribed.append(ch)
+            ready = ready and bool(ok)
+            print(f"[capture-subscribe] audio={ch} ok={bool(ok)}")
+        for ch in range(2):
+            ok = media.start_raw_video_frame(ch, lambda channel, frame, ch=ch: video(ch, channel, frame))
+            if ok:
+                video_subscribed.append(ch)
+            ready = ready and bool(ok)
+            print(f"[capture-subscribe] video={ch} ok={bool(ok)}")
+        if ready:
+            with lock:
+                accepting = True
+            print(f"[capture-recording] SPEAK NOW: {options.seconds} seconds", flush=True)
+            minimum_end = time.monotonic() + options.seconds
+            deadline = minimum_end + 5
+            while not _stop and time.monotonic() < deadline:
+                with lock:
+                    complete = all(len(data) == target for data in pcm) and all(len(v) == 5 for v in images)
+                if complete and time.monotonic() >= minimum_end:
+                    break
+                time.sleep(0.05)
+    finally:
+        with lock:
+            accepting = False
+        try:
+            for ch in audio_subscribed:
+                media.stop_raw_audio_frame(ch)
+            for ch in video_subscribed:
+                media.stop_raw_video_frame(ch)
+        finally:
+            media.shutdown()
+
+    success = ready and not _stop
+    for ch, data in enumerate(pcm):
+        path = options.capture_dir / f"dmic_ch{ch}.pcm"
+        saved = False
+        try:
+            saved = path.write_bytes(data) == len(data)
+        except OSError as exc:
+            print(f"save failed: {path}: {exc}")
+        print(f"[pcm-summary] ch={ch} bytes={len(data)} seconds={len(data)/32000:.3f} "
+              f"invalid={invalid[ch]} duplicates={duplicates[ch]} saved={saved}")
+        success = success and saved and len(data) == target and not invalid[ch] and not duplicates[ch]
+    for ch, frames in enumerate(images):
+        saved = True
+        for name, data in frames:
+            try:
+                if (options.capture_dir / name).write_bytes(data) != len(data):
+                    saved = False
+            except OSError as exc:
+                saved = False
+                print(f"save failed: {name}: {exc}")
+        print(f"[video-summary] ch={ch} nv21={len(frames)} invalid={video_invalid[ch]} saved={saved}")
+        success = success and saved and len(frames) == 5 and not video_invalid[ch]
+    return success
+
+
 def main() -> int:
     signal.signal(signal.SIGINT, _on_signal)
     signal.signal(signal.SIGTERM, _on_signal)
@@ -520,7 +660,11 @@ def main() -> int:
         _print_usage(sys.argv[0])
         return 0
 
-    options = _parse_args(sys.argv)
+    try:
+        options = _parse_args(sys.argv)
+    except ValueError as exc:
+        print(exc)
+        return 1
     _print_usage(sys.argv[0])
 
     if not _is_aarch64_local_media_target():
@@ -539,8 +683,14 @@ def main() -> int:
         return 1
 
     print("MediaBus preflight: aarch64 and Python bindings ready; using /etc/robot/sdk_config.json")
-    DUMP_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"dump dir: {DUMP_DIR}")
+    try:
+        if options.capture_dir is not None:
+            options.capture_dir.mkdir(exist_ok=False)
+        else:
+            DUMP_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print(f"create output directory failed: {exc}")
+        return 1
 
     if options.network_interface:
         sdk.service.set_network_interface(options.network_interface)
@@ -598,6 +748,9 @@ def main() -> int:
                 f"camera={layout.camera_num} encoder={layout.video_encoder_num}"
             )
 
+        if options.capture_dir is not None:
+            return 0 if _capture_all(media, options) else 2
+
         subscribed_video_raw = media.start_raw_video_frame(
             options.video_channel,
             lambda ch, frame: _on_video_frame(stats, ch, frame),
@@ -653,7 +806,8 @@ def main() -> int:
             except Exception as exc:  # noqa: BLE001
                 print(f"media shutdown raised: {exc}")
 
-        _print_summary(stats)
+        if options.capture_dir is None:
+            _print_summary(stats)
 
         if client is not None:
             try:
