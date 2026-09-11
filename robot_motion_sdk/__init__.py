@@ -524,9 +524,11 @@ class MotionHighLevelClient:
 
         Args:
             params: dict，字段：
-                {"motionEnable": bool, "sensorEnable": bool}
+                {"motionEnable": bool, "sensorEnable": bool, "trcEnable": bool}
                 - motionEnable：开启后 50Hz 推送运控观测（IMU+电机+电源），经
                   set_motion_observed_callback 回调上抛。
+                - trcEnable：配合 motionEnable，通过同一回调的 observed.trc 提供手柄数据；
+                  使用前检查 valid。关闭后 trc 清零；观测不申请控制权。
                 - sensorEnable：开启后推送完整传感器观测（GPS、UWB、odom），经
                   set_sensor_observed_callback 回调上抛。
             timeout_ms: RPC 超时
@@ -556,6 +558,7 @@ class MotionHighLevelClient:
     def set_motion_observed_callback(self, cb: Callable[[LowLevelMotionObserved], None]) -> None:
         """注册运控观测回调；需先 set_observed_enable({"motionEnable": True})。
         cb(observed: LowLevelMotionObserved) —— 每帧触发一次。
+        同时启用 trcEnable 后，从 observed.trc 读取手柄；先检查 observed.trc.valid。
         """
         self._impl.set_motion_observed_callback(cb)
 

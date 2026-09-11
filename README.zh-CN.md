@@ -390,3 +390,5 @@ finally:
 ## 7. 许可证
 
 本仓库中的 UniUbi 原创 Python binding、示例和文档使用 Apache License 2.0。vendored pybind11 按其原始许可证授权。详见 [LICENSE](LICENSE)、[NOTICE](NOTICE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+- [手柄观测](docs/trc-observation.zh-CN.md)

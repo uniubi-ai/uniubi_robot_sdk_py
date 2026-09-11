@@ -371,3 +371,5 @@ Examples are readable, editable source maintained with the repository and are no
 ## 7. License
 
 Original UniUbi Python bindings, examples, and documentation in this repository are licensed under the Apache License 2.0. Vendored pybind11 remains under its original license. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+- [Remote-controller observations](docs/trc-observation.md)
