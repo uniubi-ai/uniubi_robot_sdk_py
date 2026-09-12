@@ -44,7 +44,7 @@ env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
 |---|---|---|
 | `example_highlevel.py` | High-level 交互 CLI：状态、传感器/里程计、取权、动作和参数控制 | 启动不自动执行动作；控制命令要求空旷场地、急停可触达、有人值守 |
 | `example_lowlevel.py` | 进入低级控制并周期下发控制帧 | 必须使用吊架，急停可触达 |
-| `release_control_to_dv500.sh` | 启动独立 Python SDK 进程，恢复内置/DV500 运控 | 必须等待原 Low-level 进程完全退出；不使能电机、不发送关节命令 |
+| `release_control_to_dv500.sh` | 启动独立 Python SDK 进程，恢复内置/小脑 运控 | 必须等待原 Low-level 进程完全退出；不使能电机、不发送关节命令 |
 | `example_lowlevel_tensorrt.py` | 在 Orin 上用 TensorRT 执行 45 维观测、12 维动作的 Low-level 策略 | 先做 `--validate-only`；吊架上验证 `stand` / `lay`，空旷平整地面再验证 `walk`；急停可触达 |
 | `example_media_frames.py` | 板内订阅并落盘媒体帧 | 仅 aarch64 且 `sdk.MEDIA_ENABLED` 为真 |
 

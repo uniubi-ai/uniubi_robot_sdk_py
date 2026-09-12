@@ -375,7 +375,7 @@ Examples are readable, editable source maintained with the repository and are no
 
 ## 3. Complete Documentation
 
-- [Custom audio: upload by URL and play](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/use-media-and-device-io.md#custom-audio-upload-by-url-and-play): serve an HTTP URL from Orin/PC, let DV500 import the file, and wait for its audio ID before playback; includes a complete Python example.
+- [Custom audio: upload by URL and play](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/use-media-and-device-io.md#custom-audio-upload-by-url-and-play): serve an HTTP URL from Orin/PC, let cerebellum controller import the file, and wait for its audio ID before playback; includes a complete Python example.
 - Troubleshooting: [`docs/troubleshooting.md`](docs/troubleshooting.md)
 - Documentation home: [`uniubi-docs`](https://github.com/uniubi-ai/uniubi-docs)
 - Python / C++ interface mapping: [`docs/uniubi_high_level_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_high_level_sdk.md)
@@ -440,7 +440,7 @@ MediaBus is enabled by default on x86_64, i386, aarch64, and aarch64_host. Local
 Remote PC playback with audio capture:
 
 ```bash
-sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" python3 examples/example_audio_rawback.py input.pcm --host <DV500_IP> --device-id <ROBOT_SN> --interface <DDS_INTERFACE> --capture-channel 0
+sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" python3 examples/example_audio_rawback.py input.pcm --host <ROBOT_IP> --device-id <ROBOT_SN> --interface <DDS_INTERFACE> --capture-channel 0
 ```
 
 ### NV21 and four-channel PCM capture

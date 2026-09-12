@@ -44,7 +44,7 @@ Obtain the device ID (SN) either from the robot's **Basic Information** page in 
 |---|---|---|
 | `example_highlevel.py` | Interactive High-level CLI for state, sensors/odometry, ownership, actions, and parameters | Does not execute an action at startup; control commands require a clear area, reachable emergency stop, and attending operator |
 | `example_lowlevel.py` | Enters Low-level control and periodically sends control frames | Safety rig and reachable emergency stop required |
-| `release_control_to_dv500.sh` | Starts a dedicated Python SDK process to restore built-in/DV500 motion control | Run only after the previous Low-level process has completely exited; no motor enable or joint commands |
+| `release_control_to_dv500.sh` | Starts a dedicated Python SDK process to restore built-in/cerebellum controller motion control | Run only after the previous Low-level process has completely exited; no motor enable or joint commands |
 | `example_lowlevel_tensorrt.py` | Runs a Low-level policy with 45-dimensional observations and 12-dimensional actions through TensorRT on Orin | Run `--validate-only` first; validate `stand` / `lay` on a rig, then `walk` on clear, level ground; emergency stop reachable |
 | `example_media_frames.py` | Subscribes to and saves on-board media frames | `aarch64` only and `sdk.MEDIA_ENABLED` must be true |
 
