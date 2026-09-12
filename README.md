@@ -116,7 +116,7 @@ Use `aarch64_host` for a Linux ARM64 computer outside the robot brain board. It 
 
 Both platforms have an ARM64 CPU: `CMAKE_SYSTEM_PROCESSOR=aarch64` alone selects the Orin runtime `lib/aarch64/`. Explicitly pass `-DPLATFORM=aarch64_host` to select `lib/aarch64_host/`, including when building against an installed SDK with `find_package(UniubiRobotSdk)`. Use a new build directory when switching platforms.
 
-The host bundle uses independently rebuilt aarch64_host DDS, iceoryx, OpenSSL, zlib, ACL, and attr dependencies from the main repository (Build commit da59f36), compiled with the generic GCC 11.4 toolchain. The delivered host libraries do not depend on NVIDIA media libraries. The target needs glibc >= 2.34, libstdc++ exporting `GLIBCXX_3.4.30` (GCC 12 runtime or later), and `libatomic.so.1`. Copy the complete matching `lib/aarch64_host/` directory, including DDS and other companion libraries.
+The delivered host libraries do not depend on NVIDIA media libraries. The target needs glibc >= 2.34, libstdc++ exporting `GLIBCXX_3.4.30` (GCC 12 runtime or later), and `libatomic.so.1`. Copy the complete matching `lib/aarch64_host/` directory, including DDS and other companion libraries.
 
 From the Python SDK repository, build on the target ARM64 host with its Python interpreter:
 
