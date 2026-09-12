@@ -13,7 +13,7 @@ Python bindings for the robot motion-control SDK, built with pybind11. They prov
 
 ### Requirements
 
-- The robot version must be **1.00.000 or later**. Upgrade robots running an earlier version before using this SDK.
+- Required robot software version: [Cyvet-V1.00.000](http://192.168.1.8/RobotRelease/System/littleDog/Release/dv500/Cyvet-V1.00.000).
 - Python 3.8 or later
 - Compiled SDK runtime libraries under `$UNIUBI_SDK_ROOT/lib/<arch>/` or `/opt/uniubi/lib/<arch>/`, where `<arch>` is `x86_64`, `aarch64`, `aarch64_host`, or `i386`:
   - `librobotMotionSdk.so`, `libmediaBus.so`, `libudbus.so`, and `libubase.so` must be delivered as a matched version and architecture set.
