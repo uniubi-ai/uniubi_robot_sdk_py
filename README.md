@@ -1,5 +1,7 @@
 # Uniubi Robot SDK Python
 
+UWB observations expose the currently paired beacon ID as `uwb.beaconId` in IDL/C++ and `uwb.beacon_id` in ROS 2/Python. Check pairing state (`pairState` / `pair_state`) and `valid` alongside this ID. This version requires matching SDK, message definitions, and device firmware. Regenerate messages and rebuild applications and Python bindings after upgrading; mixing old and new layouts is unsupported.
+
 [中文文档](README.zh-CN.md)
 
 Python bindings for the robot motion-control SDK, built with pybind11. They provide the same capabilities as the C++ SDK. See the Python API references for [High-level](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/api-reference/python/high-level.md), [Low-level](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/api-reference/python/low-level.md), and [MediaBus](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/api-reference/python/media.md).

@@ -349,7 +349,8 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
         .def_readonly("rssi",       &UWBRawObserved::rssi)
         .def_readonly("pitch",      &UWBRawObserved::pitch)
         .def_readonly("azimuth",    &UWBRawObserved::azimuth)
-        .def_readonly("distance",   &UWBRawObserved::distance);
+        .def_readonly("distance",   &UWBRawObserved::distance)
+        .def_readonly("beacon_id",  &UWBRawObserved::beaconId);
 
     py::class_<SensorObserved>(m, "SensorObserved")
         .def(py::init<>())
