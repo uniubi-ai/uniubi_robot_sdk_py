@@ -49,7 +49,7 @@ A `True` return only means that the configuration frame was submitted to shared 
 
 ## Local MediaBus Configuration
 
-MediaBus is enabled by default on x86_64, i386, and aarch64. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. Remote video subscriptions and layout queries return `kNotSupported`. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
+MediaBus is enabled by default on x86_64, i386, aarch64, and aarch64_host. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. Remote video subscriptions and layout queries return `kNotSupported`. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
 
 The SDK Python native binding uses `UNIUBI_SDK_ENABLE_MEDIA` to control media-frame bindings. When unspecified, it defaults to enabled on all supported architectures. Check at runtime:
 

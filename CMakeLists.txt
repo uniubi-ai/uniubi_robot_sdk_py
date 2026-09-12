@@ -12,10 +12,15 @@ project(uniubi_robot_motion_sdk_python
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ARM64 external hosts require -DPLATFORM=aarch64_host; default ARM64 is Orin.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
     set(UNIUBI_SDK_ARCH_DIR "x86_64")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
-    set(UNIUBI_SDK_ARCH_DIR "aarch64")
+    if(PLATFORM STREQUAL "aarch64_host")
+        set(UNIUBI_SDK_ARCH_DIR "aarch64_host")
+    else()
+        set(UNIUBI_SDK_ARCH_DIR "aarch64")
+    endif()
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(i.86|x86)$")
     set(UNIUBI_SDK_ARCH_DIR "i386")
 else()

@@ -1,5 +1,7 @@
 # 保存 NV21 图像和四路 PCM
 
+普通 ARM64 外部主机请选择 `aarch64_host`：构建传入 `-DPLATFORM=aarch64_host`（Python 为 `-Ccmake.define.PLATFORM=aarch64_host`），运行时使用 `lib/aarch64_host/`。其媒体能力与 x86 远端模式相同，仅支持远程音频；Orin 本地视频/布局示例仍使用 `aarch64`。
+
 在机器人的 aarch64 Orin 板内，从仓库根目录运行。先准备同版本 SDK 运行库、媒体服务和 SHM；Python 还要求 `sdk.MEDIA_ENABLED == True`。示例连接客户端仅用于创建 MediaBus，不申请运控控制权、不发送运动指令。
 
 ## 项目配置文件

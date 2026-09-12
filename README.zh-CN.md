@@ -11,15 +11,51 @@ UWB 观测新增当前配对信标编号：IDL / C++ 为 `uwb.beaconId`，ROS 2 
 - `MotionHighLevelClient`：高级控制（预置动作、RPC 控制权）
 - `MediaBusClient`：统一媒体入口，支持本机音视频和远端音频，由 `client.create_media_bus_client()` 创建。
 
+## 普通 ARM64 外部主机（`aarch64_host`）
+
+机器人非大脑板的 ARM64 Linux 主机使用 `aarch64_host`，支持远端 High-level 控制、PCM 采集和 RawBack 播放，媒体后端与 x86 相同。Low-level 共享内存控制、本地视频和布局访问要求在机器人大脑板运行。
+
+两个平台都是 ARM64 CPU：仅设置 `CMAKE_SYSTEM_PROCESSOR=aarch64` 仍选择 Orin 的 `lib/aarch64/`。必须显式传入 `-DPLATFORM=aarch64_host` 才会选择 `lib/aarch64_host/`，通过 `find_package(UniubiRobotSdk)` 使用已安装 SDK 时也需要传入。切换平台请使用新的构建目录。
+
+交付的 host 库不依赖 NVIDIA 媒体库。目标系统需要 glibc ≥ 2.34、提供 `GLIBCXX_3.4.30` 的 libstdc++（GCC 12 或更新的运行库）及 `libatomic.so.1`。请完整携带同版本 `lib/aarch64_host/`，包括 DDS 等配套依赖。
+
+在普通 ARM64 主机的 C++ SDK 仓库中原生构建：
+
+```bash
+cmake -S . -B build-aarch64-host -DPLATFORM=aarch64_host
+cmake --build build-aarch64-host -j
+cmake --install build-aarch64-host --prefix "$HOME/.local/uniubi-aarch64-host"
+export SDK_ARCH=aarch64_host
+export LD_LIBRARY_PATH="$PWD/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
+```
+
+从 x86 交叉编译时，在配置命令中增加 `-DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux-gnu.cmake`，并安装通用 GNU `gcc-aarch64-linux-gnu` / `g++-aarch64-linux-gnu` 工具链。将产物部署到 ARM64 主机运行。该平台默认不开启 Orin TensorRT 示例。
+
+在目标 ARM64 主机的 Python SDK 仓库中，使用目标 Python 构建：
+
+```bash
+export UNIUBI_SDK_ROOT=/path/to/uniubi_robot_sdk
+python3 -m pip install . -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
+export SDK_ARCH=aarch64_host
+export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
+# 或生成该 host 平台的 wheel：
+python3 -m pip wheel . --no-deps -w dist/aarch64_host -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
+```
+
+Python wheel 不内置 SDK 运行库。Orin 和外部主机 wheel 可能具有相同的 `linux_aarch64` 标签，请保留按平台区分的产物目录并配套使用运行库；wheel 标签无法区分部署平台。SDK 头文件、运行库、扩展与设备软件必须版本匹配。
+
+远程媒体需先通过设备 ID 连接 High-level 客户端，再调用 `media.setup(robot_ip)`。使用 C++ `example_audio_rawback` 或 Python `example_audio_rawback.py --host ROBOT_IP --device-id DEVICE_ID` 并提供 PCM 文件。远端视频订阅和布局查询返回 `kNotSupported`。
+
+
 ## 1. 快速安装
 
 ### 依赖
 
 - 机器人版本必须 **大于等于 1.01.005**。低于该版本的机器人请先升级后再使用本 SDK。
 - Python ≥ 3.8
-- 已编译的 SDK 运行库（位于 `$UNIUBI_SDK_ROOT/lib/<arch>/` 或 `/opt/uniubi/lib/<arch>/`，`<arch>` ∈ `x86_64/aarch64/i386`）：
+- 已编译的 SDK 运行库（位于 `$UNIUBI_SDK_ROOT/lib/<arch>/` 或 `/opt/uniubi/lib/<arch>/`，`<arch>` ∈ `x86_64/aarch64/aarch64_host/i386`）：
   - `librobotMotionSdk.so`、`libmediaBus.so`、`libudbus.so`、`libubase.so`：运行库包按同版本、同架构成组提供
-  - x86_64、i386、aarch64 默认开启 MediaBus。Orin 本机模式支持视频、音频和布局查询；远端模式通过 `media.setup(host)` 支持 PCM 采集和 RawBack 播放。远端视频订阅和布局查询返回 `kNotSupported`。SDK 头文件、运行库、Python 扩展与设备软件必须版本匹配。
+  - x86_64、i386、aarch64、aarch64_host 默认开启 MediaBus。Orin 本机模式支持视频、音频和布局查询；远端模式通过 `media.setup(host)` 支持 PCM 采集和 RawBack 播放。远端视频订阅和布局查询返回 `kNotSupported`。SDK 头文件、运行库、Python 扩展与设备软件必须版本匹配。
 - pybind11 已 vendor 到 `ThirdParty/pybind11/`，无需另装
 
 ### Orin Low-level TensorRT 环境
@@ -285,7 +321,7 @@ with sdk.MotionHighLevelClient(device_id=target_sn) as client:
 
 ### MediaBus
 
-MediaBus 只能在机器人的 `aarch64` 大脑板内本地订阅。先完成[运行前检查](#运行-mediabus-示例前)，再运行完整示例：
+该视频/布局示例只在机器人的 `aarch64` 大脑板内运行；远程音频请使用 `example_audio_rawback.py --host ... --device-id ...`。先完成[运行前检查](#运行-mediabus-示例前)，再运行完整示例：
 
 ```bash
 sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
@@ -397,7 +433,7 @@ finally:
 
 ## PCM 音频采集与播放
 
-x86_64、i386、aarch64 默认开启 MediaBus。Orin 本机模式支持视频、音频和布局查询；远端模式通过 `media.setup(host)` 支持 PCM 采集和 RawBack 播放。远端视频订阅和布局查询返回 `kNotSupported`。SDK 头文件、运行库、Python 扩展与设备软件必须版本匹配。
+x86_64、i386、aarch64、aarch64_host 默认开启 MediaBus。Orin 本机模式支持视频、音频和布局查询；远端模式通过 `media.setup(host)` 支持 PCM 采集和 RawBack 播放。远端视频订阅和布局查询返回 `kNotSupported`。SDK 头文件、运行库、Python 扩展与设备软件必须版本匹配。
 
 [example_audio.py](examples/example_audio.py) · [example_audio_rawback.py](examples/example_audio_rawback.py) · [音频使用指南](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/stream-pcm-audio.zh-CN.md)
 

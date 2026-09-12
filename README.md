@@ -11,15 +11,51 @@ Python bindings for the robot motion-control SDK, built with pybind11. They prov
 - `MotionHighLevelClient`: built-in actions and RPC control ownership
 - `MediaBusClient`: unified local audio/video and remote audio access, created with `client.create_media_bus_client()`.
 
+## Generic ARM64 external hosts (`aarch64_host`)
+
+Use `aarch64_host` for a Linux ARM64 computer outside the robot brain board. It supports remote High-level control and remote PCM capture/RawBack playback, using the same generic media backend as x86. Low-level SHM control and local video/layout access require the robot brain board.
+
+Both platforms have an ARM64 CPU: `CMAKE_SYSTEM_PROCESSOR=aarch64` alone selects the Orin runtime `lib/aarch64/`. Explicitly pass `-DPLATFORM=aarch64_host` to select `lib/aarch64_host/`, including when building against an installed SDK with `find_package(UniubiRobotSdk)`. Use a new build directory when switching platforms.
+
+The delivered host libraries do not depend on NVIDIA media libraries. The target needs glibc >= 2.34, libstdc++ exporting `GLIBCXX_3.4.30` (GCC 12 runtime or later), and `libatomic.so.1`. Copy the complete matching `lib/aarch64_host/` directory, including DDS and other companion libraries.
+
+From the C++ SDK repository, build natively on the ARM64 host:
+
+```bash
+cmake -S . -B build-aarch64-host -DPLATFORM=aarch64_host
+cmake --build build-aarch64-host -j
+cmake --install build-aarch64-host --prefix "$HOME/.local/uniubi-aarch64-host"
+export SDK_ARCH=aarch64_host
+export LD_LIBRARY_PATH="$PWD/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
+```
+
+For an x86-to-ARM64 cross-build, add `-DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux-gnu.cmake` to the configure command and install the GNU `gcc-aarch64-linux-gnu` / `g++-aarch64-linux-gnu` toolchain. Deploy the result to the ARM64 host. The Orin TensorRT example is not enabled by default for this platform.
+
+From the Python SDK repository, build on the target ARM64 host with its Python interpreter:
+
+```bash
+export UNIUBI_SDK_ROOT=/path/to/uniubi_robot_sdk
+python3 -m pip install . -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
+export SDK_ARCH=aarch64_host
+export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
+# Alternatively, create a wheel for this host platform:
+python3 -m pip wheel . --no-deps -w dist/aarch64_host -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
+```
+
+Python wheels do not bundle SDK runtime libraries. Orin and external-host wheels can have the same `linux_aarch64` tag: retain the platform-specific output directory and use matching runtime libraries; the wheel tag does not distinguish the deployment platform. SDK headers, libraries, extensions, and device software must match.
+
+For remote media, connect the High-level client using the robot device ID, then call `media.setup(robot_ip)`. Use the C++ `example_audio_rawback` or Python `example_audio_rawback.py --host ROBOT_IP --device-id DEVICE_ID` with a PCM input file. Remote video subscriptions and layout queries return `kNotSupported`.
+
+
 ## 1. Quick Installation
 
 ### Requirements
 
 - The robot version must be **1.01.005 or later**. Upgrade robots running an earlier version before using this SDK.
 - Python 3.8 or later
-- Compiled SDK runtime libraries under `$UNIUBI_SDK_ROOT/lib/<arch>/` or `/opt/uniubi/lib/<arch>/`, where `<arch>` is `x86_64`, `aarch64`, or `i386`:
+- Compiled SDK runtime libraries under `$UNIUBI_SDK_ROOT/lib/<arch>/` or `/opt/uniubi/lib/<arch>/`, where `<arch>` is `x86_64`, `aarch64`, `aarch64_host`, or `i386`:
   - `librobotMotionSdk.so`, `libmediaBus.so`, `libudbus.so`, and `libubase.so` must be delivered as a matched version and architecture set.
-  - MediaBus is enabled by default on x86_64, i386, and aarch64. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. Remote video subscriptions and layout queries return `kNotSupported`. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
+  - MediaBus is enabled by default on x86_64, i386, aarch64, and aarch64_host. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. Remote video subscriptions and layout queries return `kNotSupported`. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
 - pybind11 is vendored under `ThirdParty/pybind11/`; no separate installation is required.
 
 ### Orin Low-level TensorRT environment
@@ -378,7 +414,7 @@ Original UniUbi Python bindings, examples, and documentation in this repository 
 
 ## PCM audio capture and playback
 
-MediaBus is enabled by default on x86_64, i386, and aarch64. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. Remote video subscriptions and layout queries return `kNotSupported`. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
+MediaBus is enabled by default on x86_64, i386, aarch64, and aarch64_host. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. Remote video subscriptions and layout queries return `kNotSupported`. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
 
 [example_audio.py](examples/example_audio.py) · [example_audio_rawback.py](examples/example_audio_rawback.py) · [Audio guide](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/stream-pcm-audio.md)
 
