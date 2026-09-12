@@ -17,7 +17,7 @@ UWB 观测新增当前配对信标编号：IDL / C++ 为 `uwb.beaconId`，ROS 2 
 
 两个平台都是 ARM64 CPU：仅设置 `CMAKE_SYSTEM_PROCESSOR=aarch64` 仍选择 Orin 的 `lib/aarch64/`。必须显式传入 `-DPLATFORM=aarch64_host` 才会选择 `lib/aarch64_host/`，通过 `find_package(UniubiRobotSdk)` 使用已安装 SDK 时也需要传入。切换平台请使用新的构建目录。
 
-交付的 host 库不依赖 NVIDIA 媒体库。目标系统需要 glibc ≥ 2.34、提供 `GLIBCXX_3.4.30` 的 libstdc++（GCC 12 或更新的运行库）及 `libatomic.so.1`。请完整携带同版本 `lib/aarch64_host/`，包括 DDS 等配套依赖。
+host 包使用主仓 Build 提交 da59f36 中由通用 GCC 11.4 独立编译的 aarch64_host DDS、iceoryx、OpenSSL、zlib、ACL 和 attr 依赖。交付的 host 库不依赖 NVIDIA 媒体库。目标系统需要 glibc ≥ 2.34、提供 `GLIBCXX_3.4.30` 的 libstdc++（GCC 12 或更新的运行库）及 `libatomic.so.1`。请完整携带同版本 `lib/aarch64_host/`，包括 DDS 等配套依赖。
 
 在普通 ARM64 主机的 C++ SDK 仓库中原生构建：
 
