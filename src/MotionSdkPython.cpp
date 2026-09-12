@@ -67,6 +67,29 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
     m.doc() = "UU Robot Motion SDK native bindings (pybind11)";
     m.attr("MEDIA_ENABLED") = py::bool_(UNIUBI_ROBOTSDK_PY_ENABLE_MEDIA != 0);
 
+#if UNIUBI_ROBOTSDK_PY_ENABLE_MEDIA
+    py::enum_<IAudioRawBackStream::AudioError>(m, "AudioRawBackError")
+        .value("kNone", IAudioRawBackStream::kNone)
+        .value("kInvalidParam", IAudioRawBackStream::kInvalidParam)
+        .value("kAlreadyInitialized", IAudioRawBackStream::kAlreadyInitialized)
+        .value("kNotInitialized", IAudioRawBackStream::kNotInitialized)
+        .value("kConnectFailed", IAudioRawBackStream::kConnectFailed)
+        .value("kNotConnected", IAudioRawBackStream::kNotConnected)
+        .value("kRpcCallFailed", IAudioRawBackStream::kRpcCallFailed)
+        .value("kPlaybackFailed", IAudioRawBackStream::kPlaybackFailed);
+
+    py::class_<IAudioRawBackStream, IAudioRawBackStream::Ptr>(m, "AudioRawBackStream")
+        .def("setup", &IAudioRawBackStream::setup,py::call_guard<py::gil_scoped_release>())
+        .def("shutdown", &IAudioRawBackStream::shutdown,py::call_guard<py::gil_scoped_release>())
+        .def("ready", &IAudioRawBackStream::ready)
+        .def("get_last_error", &IAudioRawBackStream::getLastError)
+        .def("write", &IAudioRawBackStream::write, py::arg("frame"),
+             py::call_guard<py::gil_scoped_release>())
+        .def("reset", &IAudioRawBackStream::reset, py::call_guard<py::gil_scoped_release>())
+        .def("set_volume", &IAudioRawBackStream::setVolume, py::arg("volume"),
+             py::call_guard<py::gil_scoped_release>());
+#endif
+
     /// ───────────────────────────────────────────────────────
     /// IMotionSdkService 日志级别枚举
     /// ───────────────────────────────────────────────────────
@@ -349,7 +372,8 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
         .def_readonly("rssi",       &UWBRawObserved::rssi)
         .def_readonly("pitch",      &UWBRawObserved::pitch)
         .def_readonly("azimuth",    &UWBRawObserved::azimuth)
-        .def_readonly("distance",   &UWBRawObserved::distance);
+        .def_readonly("distance",   &UWBRawObserved::distance)
+        .def_readonly("beacon_id",  &UWBRawObserved::beaconId);
 
     py::class_<SensorObserved>(m, "SensorObserved")
         .def(py::init<>())
@@ -427,14 +451,20 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
         .value("kInvalidCallback",  IMediaBusClient::kInvalidCallback)
         .value("kSourceUnavailable",IMediaBusClient::kSourceUnavailable)
         .value("kSourceStartFailed",IMediaBusClient::kSourceStartFailed)
+        .value("kInvalidParam",     IMediaBusClient::kInvalidParam)
+        .value("kCaptureFailed",    IMediaBusClient::kCaptureFailed)
+        .value("kConnectFailed",    IMediaBusClient::kConnectFailed)
+        .value("kNotSupported",     IMediaBusClient::kNotSupported)
         .export_values();
 
     py::class_<IMediaBusClient, std::shared_ptr<IMediaBusClient>>(m, "MediaBusClient")
-        .def("setup",    &IMediaBusClient::setup,
+        .def("setup",    &IMediaBusClient::setup,py::arg("host") = std::string(),
              py::call_guard<py::gil_scoped_release>())
         .def("shutdown", &IMediaBusClient::shutdown,
              py::call_guard<py::gil_scoped_release>())
         .def("get_last_error", &IMediaBusClient::getLastError)
+        .def("create_audio_raw_back", &IMediaBusClient::createAudioRawBack,
+             py::call_guard<py::gil_scoped_release>())
         .def("get_media_layout", [](IMediaBusClient& self) -> py::object {
                 MediaLayout layout = {};
                 bool ok;
@@ -455,12 +485,13 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
         .def("stop_raw_video_frame", &IMediaBusClient::stopRawVideoFrame, py::arg("channel"))
         .def("start_raw_audio_frame", [](IMediaBusClient& self, int32_t channel, py::function cb) {
                 PyCallback callback = makePyCallback(std::move(cb));
+                py::gil_scoped_release release;
                 return self.startRawAudioFrame(channel, [callback](int32_t ch, const AudioFrame& frame) {
                     py::gil_scoped_acquire g;
-                    try { (*callback)(ch, frame); } catch (py::error_already_set& e) { e.discard_as_unraisable(__func__); }
+                    try { (*callback)(ch, py::cast(frame, py::return_value_policy::copy)); } catch (py::error_already_set& e) { e.discard_as_unraisable(__func__); }
                 });
             }, py::arg("channel"), py::arg("callback"))
-        .def("stop_raw_audio_frame", &IMediaBusClient::stopRawAudioFrame, py::arg("channel"))
+        .def("stop_raw_audio_frame", &IMediaBusClient::stopRawAudioFrame, py::arg("channel"), py::call_guard<py::gil_scoped_release>())
         .def("start_encoded_video_frame", [](IMediaBusClient& self, int32_t channel, py::function cb) {
                 PyCallback callback = makePyCallback(std::move(cb));
                 return self.startEncodedVideoFrame(channel, [callback](int32_t ch, const EncodedVideoFrame& frame) {

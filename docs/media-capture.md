@@ -1,5 +1,7 @@
 # Capture NV21 images and four PCM streams
 
+For generic ARM64 external hosts, select `aarch64_host`: build with `-DPLATFORM=aarch64_host` (Python: `-Ccmake.define.PLATFORM=aarch64_host`) and load `lib/aarch64_host/`. Media support matches x86 remote mode: remote audio only. Orin local video/layout examples still use `aarch64`.
+
 Run from this repository root on the robot's aarch64 Orin board, with matching SDK runtime libraries, media service and SHM ready. Python additionally requires `sdk.MEDIA_ENABLED == True`. This example connects a client only to create MediaBus; it does not acquire motion-control ownership or send movement commands.
 
 ## Configuration template

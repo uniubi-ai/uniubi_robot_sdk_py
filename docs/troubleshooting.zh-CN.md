@@ -49,9 +49,9 @@
 
 ## MediaBus 本地配置
 
-`MediaBusClient` 用于 `aarch64` 板内本地媒体帧订阅。远端 / 多设备 SDK 模式不提供 MediaBus 帧订阅；`x86_64` / `i386` 平台不要调用 `create_media_bus_client()`、`setup()` 或 `start_*_frame()`。
+x86_64、i386、aarch64、aarch64_host 默认开启 MediaBus。Orin 本机模式支持视频、音频和布局查询；远端模式通过 `media.setup(host)` 支持 PCM 采集和 RawBack 播放。远端视频订阅和布局查询返回 `kNotSupported`。SDK 头文件、运行库、Python 扩展与设备软件必须版本匹配。
 
-SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定。未显式指定时，`aarch64` 默认开启，`x86_64` / `i386` 默认关闭。运行时先检查：
+SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定。未显式指定时，所有支持架构默认开启。运行时先检查：
 
 ```python
 import robot_motion_sdk as sdk
