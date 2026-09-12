@@ -427,3 +427,5 @@ sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" python3 examples/example_audio_rawba
 ### NV21 and four-channel PCM capture
 
 Use `--capture-all` to save five NV21 images per camera and four 20-second PCM files. Configuration template, commands and validation: [NV21 and four-channel PCM capture](docs/media-capture.md).
+
+- [High-level controller input example](examples/example_highlevel_trc.py) — [TRC usage](docs/trc-observation.md)

@@ -446,3 +446,5 @@ sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" python3 examples/example_audio_rawba
 ### NV21 与四路 PCM 采集
 
 使用 `--capture-all` 保存每路摄像头 5 张 NV21 图像和四路各 20 秒 PCM。配置模板、命令与验收方法：[NV21 与四路 PCM 采集](docs/media-capture.zh-CN.md)。
+
+- [High-level 遥控器按键示例](examples/example_highlevel_trc.py) — [TRC 运行说明](docs/trc-observation.zh-CN.md)
