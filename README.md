@@ -11,42 +11,6 @@ Python bindings for the robot motion-control SDK, built with pybind11. They prov
 - `MotionHighLevelClient`: built-in actions and RPC control ownership
 - `MediaBusClient`: unified local audio/video and remote audio access, created with `client.create_media_bus_client()`.
 
-## Generic ARM64 external hosts (`aarch64_host`)
-
-Use `aarch64_host` for a Linux ARM64 computer outside the robot brain board. It supports remote High-level control and remote PCM capture/RawBack playback, using the same generic media backend as x86. Low-level SHM control and local video/layout access require the robot brain board.
-
-Both platforms have an ARM64 CPU: `CMAKE_SYSTEM_PROCESSOR=aarch64` alone selects the Orin runtime `lib/aarch64/`. Explicitly pass `-DPLATFORM=aarch64_host` to select `lib/aarch64_host/`, including when building against an installed SDK with `find_package(UniubiRobotSdk)`. Use a new build directory when switching platforms.
-
-The host bundle uses independently rebuilt aarch64_host DDS, iceoryx, OpenSSL, zlib, ACL, and attr dependencies from the main repository (Build commit da59f36), compiled with the generic GCC 11.4 toolchain. The delivered host libraries do not depend on NVIDIA media libraries. The target needs glibc >= 2.34, libstdc++ exporting `GLIBCXX_3.4.30` (GCC 12 runtime or later). Copy the complete matching `lib/aarch64_host/` directory, including DDS and other companion libraries.
-
-From the C++ SDK repository, build natively on the ARM64 host:
-
-```bash
-cmake -S . -B build-aarch64-host -DPLATFORM=aarch64_host
-cmake --build build-aarch64-host -j
-cmake --install build-aarch64-host --prefix "$HOME/.local/uniubi-aarch64-host"
-export SDK_ARCH=aarch64_host
-export LD_LIBRARY_PATH="$PWD/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
-```
-
-For an x86-to-ARM64 cross-build, add `-DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux-gnu.cmake` to the configure command and install the GNU `gcc-aarch64-linux-gnu` / `g++-aarch64-linux-gnu` toolchain. Deploy the result to the ARM64 host. The Orin TensorRT example is not enabled by default for this platform.
-
-From the Python SDK repository, build on the target ARM64 host with its Python interpreter:
-
-```bash
-export UNIUBI_SDK_ROOT=/path/to/uniubi_robot_sdk
-python3 -m pip install . -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
-export SDK_ARCH=aarch64_host
-export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
-# Alternatively, create a wheel for this host platform:
-python3 -m pip wheel . --no-deps -w dist/aarch64_host -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
-```
-
-Python wheels do not bundle SDK runtime libraries. Orin and external-host wheels can have the same `linux_aarch64` tag: retain the platform-specific output directory and use matching runtime libraries; the wheel tag does not distinguish the deployment platform. SDK headers, libraries, extensions, and device software must match.
-
-For remote media, connect the High-level client using the robot device ID, then call `media.setup(robot_ip)`. Use the C++ `example_audio_rawback` or Python `example_audio_rawback.py --host ROBOT_IP --device-id DEVICE_ID` with a PCM input file. Remote video subscriptions and layout queries return `kNotSupported`.
-
-
 ## 1. Quick Installation
 
 ### Requirements
@@ -101,15 +65,40 @@ The optional first argument to `example_media_frames.py` is the Motion SDK servi
 
 See [Local MediaBus Configuration](docs/troubleshooting.md#local-mediabus-configuration) for the configuration schema, error mapping, and SHM checks.
 
+### Select the runtime platform
+
+| Runtime location | SDK libraries | Installation |
+|---|---|---|
+| Brain board | `lib/aarch64/` | Install with the board Python; on-board programs use system Python |
+| x86 host | `lib/x86_64/` | Install with the host Python, optionally in a virtual environment |
+| ARM64 host | `lib/aarch64_host/` | Select the platform explicitly as shown below |
+
 ### pip install (recommended for an independent Python project)
+
+Run the pip installation commands below on the corresponding target machine.
 
 ```bash
 git clone https://github.com/uniubi-ai/uniubi_robot_sdk.git ~/uniubi_robot_sdk
 git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
 export UNIUBI_SDK_ROOT=~/uniubi_robot_sdk   # or pass -Ccmake.define.UNIUBI_SDK_ROOT=...
+```
+
+#### Brain board (`aarch64`)
+
+Install into the system Python on the brain board:
+
+```bash
 sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
   python3 -m pip install .
+```
+
+#### x86 host (`x86_64`)
+
+Install into the current Python environment on the host:
+
+```bash
+python3 -m pip install .
 ```
 
 This produces a standard wheel with an ABI suffix for the Python version, for example:
@@ -122,6 +111,27 @@ UNIUBI_SDK_ROOT=~/uniubi_robot_sdk python3 -m pip wheel . -w dist
 ```
 
 For an offline environment, preinstall `scikit-build-core` and CMake, then add `--no-build-isolation` to prevent pip's temporary build environment from downloading tools.
+
+#### ARM64 host (`aarch64_host`)
+
+Use `aarch64_host` for a Linux ARM64 computer outside the robot brain board. It supports remote High-level control and remote PCM capture/RawBack playback, using the same generic media backend as x86. Low-level SHM control and local video/layout access require the robot brain board.
+
+Both platforms have an ARM64 CPU: `CMAKE_SYSTEM_PROCESSOR=aarch64` alone selects the Orin runtime `lib/aarch64/`. Explicitly pass `-DPLATFORM=aarch64_host` to select `lib/aarch64_host/`, including when building against an installed SDK with `find_package(UniubiRobotSdk)`. Use a new build directory when switching platforms.
+
+The host bundle uses independently rebuilt aarch64_host DDS, iceoryx, OpenSSL, zlib, ACL, and attr dependencies from the main repository (Build commit da59f36), compiled with the generic GCC 11.4 toolchain. The delivered host libraries do not depend on NVIDIA media libraries. The target needs glibc >= 2.34, libstdc++ exporting `GLIBCXX_3.4.30` (GCC 12 runtime or later), and `libatomic.so.1`. Copy the complete matching `lib/aarch64_host/` directory, including DDS and other companion libraries.
+
+From the Python SDK repository, build on the target ARM64 host with its Python interpreter:
+
+```bash
+export UNIUBI_SDK_ROOT=/path/to/uniubi_robot_sdk
+python3 -m pip install . -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
+export SDK_ARCH=aarch64_host
+export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
+# Alternatively, create a wheel for this host platform:
+python3 -m pip wheel . --no-deps -w dist/aarch64_host -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
+```
+
+Python wheels do not bundle SDK runtime libraries. Orin and external-host wheels can have the same `linux_aarch64` tag: retain the platform-specific output directory and use matching runtime libraries; the wheel tag does not distinguish the deployment platform. SDK headers, libraries, extensions, and device software must match.
 
 ### Editable source build
 

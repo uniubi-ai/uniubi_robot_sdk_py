@@ -11,42 +11,6 @@ UWB 观测新增当前配对信标编号：IDL / C++ 为 `uwb.beaconId`，ROS 2 
 - `MotionHighLevelClient`：高级控制（预置动作、RPC 控制权）
 - `MediaBusClient`：统一媒体入口，支持本机音视频和远端音频，由 `client.create_media_bus_client()` 创建。
 
-## 普通 ARM64 外部主机（`aarch64_host`）
-
-机器人非大脑板的 ARM64 Linux 主机使用 `aarch64_host`，支持远端 High-level 控制、PCM 采集和 RawBack 播放，媒体后端与 x86 相同。Low-level 共享内存控制、本地视频和布局访问要求在机器人大脑板运行。
-
-两个平台都是 ARM64 CPU：仅设置 `CMAKE_SYSTEM_PROCESSOR=aarch64` 仍选择 Orin 的 `lib/aarch64/`。必须显式传入 `-DPLATFORM=aarch64_host` 才会选择 `lib/aarch64_host/`，通过 `find_package(UniubiRobotSdk)` 使用已安装 SDK 时也需要传入。切换平台请使用新的构建目录。
-
-host 包使用主仓 Build 提交 da59f36 中由通用 GCC 11.4 独立编译的 aarch64_host DDS、iceoryx、OpenSSL、zlib、ACL 和 attr 依赖。交付的 host 库不依赖 NVIDIA 媒体库。目标系统需要 glibc ≥ 2.34、提供 `GLIBCXX_3.4.30` 的 libstdc++（GCC 12 或更新的运行库）及 `libatomic.so.1`。请完整携带同版本 `lib/aarch64_host/`，包括 DDS 等配套依赖。
-
-在普通 ARM64 主机的 C++ SDK 仓库中原生构建：
-
-```bash
-cmake -S . -B build-aarch64-host -DPLATFORM=aarch64_host
-cmake --build build-aarch64-host -j
-cmake --install build-aarch64-host --prefix "$HOME/.local/uniubi-aarch64-host"
-export SDK_ARCH=aarch64_host
-export LD_LIBRARY_PATH="$PWD/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
-```
-
-从 x86 交叉编译时，在配置命令中增加 `-DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux-gnu.cmake`，并安装通用 GNU `gcc-aarch64-linux-gnu` / `g++-aarch64-linux-gnu` 工具链。将产物部署到 ARM64 主机运行。该平台默认不开启 Orin TensorRT 示例。
-
-在目标 ARM64 主机的 Python SDK 仓库中，使用目标 Python 构建：
-
-```bash
-export UNIUBI_SDK_ROOT=/path/to/uniubi_robot_sdk
-python3 -m pip install . -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
-export SDK_ARCH=aarch64_host
-export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
-# 或生成该 host 平台的 wheel：
-python3 -m pip wheel . --no-deps -w dist/aarch64_host -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
-```
-
-Python wheel 不内置 SDK 运行库。Orin 和外部主机 wheel 可能具有相同的 `linux_aarch64` 标签，请保留按平台区分的产物目录并配套使用运行库；wheel 标签无法区分部署平台。SDK 头文件、运行库、扩展与设备软件必须版本匹配。
-
-远程媒体需先通过设备 ID 连接 High-level 客户端，再调用 `media.setup(robot_ip)`。使用 C++ `example_audio_rawback` 或 Python `example_audio_rawback.py --host ROBOT_IP --device-id DEVICE_ID` 并提供 PCM 文件。远端视频订阅和布局查询返回 `kNotSupported`。
-
-
 ## 1. 快速安装
 
 ### 依赖
@@ -106,15 +70,40 @@ SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定
 
 配置结构、错误码对应原因和 SHM 检查方法见[MediaBus 本地配置](docs/troubleshooting.zh-CN.md#mediabus-本地配置)。
 
+### 选择运行平台
+
+| 运行位置 | SDK 运行库 | 安装方式 |
+|---|---|---|
+| 大脑 | `lib/aarch64/` | 使用大脑板 Python 安装，板载程序使用系统 Python |
+| x86 host | `lib/x86_64/` | 使用主机 Python 安装，可使用虚拟环境 |
+| aarch64 host | `lib/aarch64_host/` | 显式指定平台，见下方 ARM64 host 步骤 |
+
 ### pip install（推荐，独立 Python 项目）
+
+在对应目标机器上执行下方 pip 安装命令。
 
 ```bash
 git clone https://github.com/uniubi-ai/uniubi_robot_sdk.git ~/uniubi_robot_sdk
 git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
 export UNIUBI_SDK_ROOT=~/uniubi_robot_sdk   # 或在命令行加 -Ccmake.define.UNIUBI_SDK_ROOT=...
+```
+
+#### 大脑（`aarch64`）
+
+在大脑板上安装到系统 Python：
+
+```bash
 sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
   python3 -m pip install .
+```
+
+#### x86 host（`x86_64`）
+
+在主机当前 Python 环境中安装：
+
+```bash
+python3 -m pip install .
 ```
 
 产出标准 wheel，按 Python 版本附 ABI 后缀：
@@ -127,6 +116,27 @@ UNIUBI_SDK_ROOT=~/uniubi_robot_sdk python3 -m pip wheel . -w dist
 ```
 
 离线环境需要预先安装 `scikit-build-core` 和 CMake，然后为 pip 增加 `--no-build-isolation`，避免临时构建环境联网下载工具。
+
+#### aarch64 host（`aarch64_host`）
+
+机器人非大脑板的 ARM64 Linux 主机使用 `aarch64_host`，支持远端 High-level 控制、PCM 采集和 RawBack 播放，媒体后端与 x86 相同。Low-level 共享内存控制、本地视频和布局访问要求在机器人大脑板运行。
+
+两个平台都是 ARM64 CPU：仅设置 `CMAKE_SYSTEM_PROCESSOR=aarch64` 仍选择 Orin 的 `lib/aarch64/`。必须显式传入 `-DPLATFORM=aarch64_host` 才会选择 `lib/aarch64_host/`，通过 `find_package(UniubiRobotSdk)` 使用已安装 SDK 时也需要传入。切换平台请使用新的构建目录。
+
+host 包使用主仓 Build 提交 da59f36 中由通用 GCC 11.4 独立编译的 aarch64_host DDS、iceoryx、OpenSSL、zlib、ACL 和 attr 依赖。交付的 host 库不依赖 NVIDIA 媒体库。目标系统需要 glibc ≥ 2.34、提供 `GLIBCXX_3.4.30` 的 libstdc++（GCC 12 或更新的运行库）及 `libatomic.so.1`。请完整携带同版本 `lib/aarch64_host/`，包括 DDS 等配套依赖。
+
+在目标 ARM64 主机的 Python SDK 仓库中，使用目标 Python 构建：
+
+```bash
+export UNIUBI_SDK_ROOT=/path/to/uniubi_robot_sdk
+python3 -m pip install . -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
+export SDK_ARCH=aarch64_host
+export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
+# 或生成该 host 平台的 wheel：
+python3 -m pip wheel . --no-deps -w dist/aarch64_host -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
+```
+
+Python wheel 不内置 SDK 运行库。Orin 和外部主机 wheel 可能具有相同的 `linux_aarch64` 标签，请保留按平台区分的产物目录并配套使用运行库；wheel 标签无法区分部署平台。SDK 头文件、运行库、扩展与设备软件必须版本匹配。
 
 ### 源码构建（开发期）
 
