@@ -8,7 +8,8 @@ Examples:
   python3 example_media_frames.py
   python3 example_media_frames.py - mediaFramePythonExample - 0 0 10 eth0
 
-Media frame subscription is supported only on aarch64 local board deployment.
+This video/layout example requires aarch64 local board deployment.
+Use example_audio_rawback.py with --host and --device-id for remote audio.
 Before running, verify that /etc/robot/sdk_config.json contains a top-level
 streamDefine object and that the on-board media service, requested channels,
 and SHM environment are ready. The optional config argument configures the
@@ -524,7 +525,7 @@ def main() -> int:
     _print_usage(sys.argv[0])
 
     if not _is_aarch64_local_media_target():
-        print("media frame subscription is only supported on aarch64 local board deployment")
+        print("this video/layout example requires aarch64 local deployment; use example_audio_rawback.py for remote audio")
         return 1
 
     if not getattr(sdk, "MEDIA_ENABLED", False):
@@ -564,9 +565,9 @@ def main() -> int:
             print(f"troubleshooting: {TROUBLESHOOTING_URL}")
             return 1
 
-        # MediaBus 仅支持 aarch64 板内本地部署；多设备/远端模式不提供帧订阅。
+        # 本示例使用视频和布局查询，仅支持本机模式；远端音频见 example_audio_rawback.py。
         if sdk.service.is_multi_device():
-            print("media bus frame subscription is only supported on local board deployment")
+            print("this video/layout example requires local deployment; use example_audio_rawback.py for remote audio")
             return 1
 
         # MediaBusClient 由已 connect 的客户端工厂分配；这里只取音视频帧，

@@ -9,7 +9,7 @@ Python bindings for the robot motion-control SDK, built with pybind11. They prov
 - `service`: one-time global initialization
 - `MotionLowLevelClient`: joint-level control; RPC control plane plus on-board shared-memory (SHM) data plane; local single-device only
 - `MotionHighLevelClient`: built-in actions and RPC control ownership
-- `MediaBusClient`: audio/video frame subscription, created with `client.create_media_bus_client()`; local on-board `aarch64` only; see [`uniubi-docs/docs/uniubi_media_sdk.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_media_sdk.md)
+- `MediaBusClient`: unified local audio/video and remote audio access, created with `client.create_media_bus_client()`.
 
 ## 1. Quick Installation
 
@@ -19,7 +19,7 @@ Python bindings for the robot motion-control SDK, built with pybind11. They prov
 - Python 3.8 or later
 - Compiled SDK runtime libraries under `$UNIUBI_SDK_ROOT/lib/<arch>/` or `/opt/uniubi/lib/<arch>/`, where `<arch>` is `x86_64`, `aarch64`, or `i386`:
   - `librobotMotionSdk.so`, `libmediaBus.so`, `libudbus.so`, and `libubase.so` must be delivered as a matched version and architecture set.
-  - `MediaBusClient` supports only local, on-board media-frame subscription on `aarch64`; do not call it on `x86_64` or `i386`.
+  - MediaBus is enabled by default on x86_64, i386, and aarch64. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. Remote video subscriptions and layout queries return `kNotSupported`. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
 - pybind11 is vendored under `ThirdParty/pybind11/`; no separate installation is required.
 
 ### Orin Low-level TensorRT environment
@@ -46,10 +46,10 @@ This runtime path does not depend on PyTorch, TorchVision, ONNX Runtime, or cuSP
 
 The SDK Python native binding uses `UNIUBI_SDK_ENABLE_MEDIA` to control media-frame bindings:
 
-- When unspecified, it defaults to `ON` on `aarch64` and `OFF` on `x86_64` / `i386`.
+- When unspecified, it defaults to `ON` on all supported architectures.
 - An `OFF` build still provides LowLevel and HighLevel motion interfaces, but does not compile media-frame bindings or expose `MediaBusError`, `VideoFrame`, `AudioFrame`, or `EncodedVideoFrame`.
 - At runtime, check `sdk.MEDIA_ENABLED`. When it is `False`, `create_media_bus_client()` raises `RuntimeError("MediaBus is not available in this SDK build")`.
-- Enable media bindings only for local on-board `aarch64` deployment. Do not force-enable them on `x86_64` / `i386` merely to compile and then call media interfaces.
+
 
 ### Before running the MediaBus example
 
@@ -266,7 +266,7 @@ For initial hardware integration, complete read-only checks first, then use the 
 
 ### MediaBus
 
-MediaBus subscription runs only on the robot's `aarch64` brain board. Complete the [MediaBus preflight checks](#before-running-the-mediabus-example) first, then run the full example:
+This video/layout example runs on the robot's `aarch64` brain board. Use `example_audio_rawback.py --host ... --device-id ...` for remote audio. Complete the [MediaBus preflight checks](#before-running-the-mediabus-example) first, then run the full example:
 
 ```bash
 sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
@@ -360,7 +360,7 @@ Examples are readable, editable source maintained with the repository and are no
 | `IMUObserved` / `Vector3f` / `Quaternionf` / `PowerObserved` / `TRCStickFrame` | Same-named classes exposed through `obs.imu` / `obs.power` / `obs.trc` |
 | `SensorObserved` / `GPSFrame` / `GEOGPoint` / `UWBRawObserved` / `MotionOdometry` | Same-named classes returned by HighLevel `get_sensor_observation()` and read through `sensor.gps` / `sensor.uwb` / `sensor.odom` |
 | `MediaLayout` | Same-named Python class always exported by the motion native module |
-| `VideoFrame` / `AudioFrame` / `EncodedVideoFrame` | Same-named classes exported only when `sdk.MEDIA_ENABLED == True`; for local on-board `MediaBusClient` callbacks on `aarch64` only |
+| `VideoFrame` / `AudioFrame` / `EncodedVideoFrame` | Same-named classes exported only when `sdk.MEDIA_ENABLED == True`; audio callbacks work in local and remote modes; video callbacks require local deployment |
 | `ButtonDefine` / `AxesDefine` / `GPSSignalLevel` / `GEOGCoordMode` / `UWBPairState` / `MotionControlMode` | Same-named `IntEnum` types for button/axis indexes and GPS/UWB/coordinate decoding |
 
 ## 6. Known Limitations
@@ -368,10 +368,22 @@ Examples are readable, editable source maintained with the repository and are no
 - Windows is not supported; Linux only.
 - Python multi-interpreter embedding is not supported.
 - Python observation callbacks are affected by the GIL. High-level `set_motion_observed_callback` is approximately 50 Hz; for high-frequency Low-level observations use pull mode with `get_latest_observation()` at 500 Hz or above.
-- Media-frame subscription supports only local on-board `aarch64` deployment. `x86_64` / `i386` builds default to `sdk.MEDIA_ENABLED == False`; do not call `create_media_bus_client()`, `setup()`, or `start_*_frame()`. Runtime `.so` files must still remain a matched version and architecture set.
+- Keep runtime libraries and Python extensions matched to device software; see the PCM example below for remote audio arguments.
 
 ## 7. License
 
 Original UniUbi Python bindings, examples, and documentation in this repository are licensed under the Apache License 2.0. Vendored pybind11 remains under its original license. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 - [Remote-controller observations](docs/trc-observation.md)
+
+## PCM audio capture and playback
+
+MediaBus is enabled by default on x86_64, i386, and aarch64. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. Remote video subscriptions and layout queries return `kNotSupported`. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
+
+[example_audio.py](examples/example_audio.py) · [example_audio_rawback.py](examples/example_audio_rawback.py) · [Audio guide](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/stream-pcm-audio.md)
+
+Remote PC playback with audio capture:
+
+```bash
+sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" python3 examples/example_audio_rawback.py input.pcm --host <DV500_IP> --device-id <ROBOT_SN> --interface <DDS_INTERFACE> --capture-channel 0
+```

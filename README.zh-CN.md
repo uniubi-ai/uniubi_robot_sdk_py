@@ -9,7 +9,7 @@ UWB 观测新增当前配对信标编号：IDL / C++ 为 `uwb.beaconId`，ROS 2 
 - `service`：全局初始化（一次）
 - `MotionLowLevelClient`：低级控制（关节级；RPC 控制面 + 板内共享内存(SHM) 数据面，仅板内单设备）
 - `MotionHighLevelClient`：高级控制（预置动作、RPC 控制权）
-- `MediaBusClient`：音视频帧订阅（由 `client.create_media_bus_client()` 派生，仅 `aarch64` 板内本地部署支持；详见 [`uniubi-docs/docs/uniubi_media_sdk.zh-CN.md`](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/uniubi_media_sdk.zh-CN.md)）
+- `MediaBusClient`：统一媒体入口，支持本机音视频和远端音频，由 `client.create_media_bus_client()` 创建。
 
 ## 1. 快速安装
 
@@ -19,7 +19,7 @@ UWB 观测新增当前配对信标编号：IDL / C++ 为 `uwb.beaconId`，ROS 2 
 - Python ≥ 3.8
 - 已编译的 SDK 运行库（位于 `$UNIUBI_SDK_ROOT/lib/<arch>/` 或 `/opt/uniubi/lib/<arch>/`，`<arch>` ∈ `x86_64/aarch64/i386`）：
   - `librobotMotionSdk.so`、`libmediaBus.so`、`libudbus.so`、`libubase.so`：运行库包按同版本、同架构成组提供
-  - `MediaBusClient` 功能仅 `aarch64` 板内本地媒体帧订阅支持；`x86_64` / `i386` 平台不要调用 `MediaBusClient`
+  - x86_64、i386、aarch64 默认开启 MediaBus。Orin 本机模式支持视频、音频和布局查询；远端模式通过 `media.setup(host)` 支持 PCM 采集和 RawBack 播放。远端视频订阅和布局查询返回 `kNotSupported`。SDK 头文件、运行库、Python 扩展与设备软件必须版本匹配。
 - pybind11 已 vendor 到 `ThirdParty/pybind11/`，无需另装
 
 ### Orin Low-level TensorRT 环境
@@ -51,10 +51,10 @@ sudo -H python3 -m pip install 'numpy>=1.26,<2' 'cuda-python>=12.6,<12.7'
 
 SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定：
 
-- 未显式指定时，`aarch64` 默认 `ON`，`x86_64` / `i386` 默认 `OFF`。
+- 未显式指定时，所有支持架构默认 `ON`。
 - `OFF` 构建仍提供 LowLevel / HighLevel 运控接口，但 native 不编译媒体帧绑定，不提供 `MediaBusError` 和 `VideoFrame` / `AudioFrame` / `EncodedVideoFrame` 等媒体帧类型。
 - 运行时可用 `sdk.MEDIA_ENABLED` 判断当前 wheel 是否包含媒体绑定；为 `False` 时调用 `create_media_bus_client()` 会抛出 `RuntimeError("MediaBus is not available in this SDK build")`。
-- 只有 `aarch64` 板内本地部署应开启媒体绑定；不要为了让 `x86_64` / `i386` 编译通过而强行开启后调用媒体接口。
+
 
 ### 运行 MediaBus 示例前
 
@@ -379,7 +379,7 @@ finally:
 | `IMUObserved` / `Vector3f` / `Quaternionf` / `PowerObserved` / `TRCStickFrame` | 同名 Python 类（`obs.imu` / `obs.power` / `obs.trc` 字段） |
 | `SensorObserved` / `GPSFrame` / `GEOGPoint` / `UWBRawObserved` / `MotionOdometry` | 同名 Python 类（HighLevel `get_sensor_observation()` 返回；通过 `sensor.gps` / `sensor.uwb` / `sensor.odom` 读取） |
 | `MediaLayout` | 同名 Python 类（运控 native 模块固定导出） |
-| `VideoFrame` / `AudioFrame` / `EncodedVideoFrame` | 同名 Python 类（仅 `sdk.MEDIA_ENABLED == True` 时导出，仅 `aarch64` 板内本地 `MediaBusClient` 帧订阅回调使用；详见媒体 SDK 手册） |
+| `VideoFrame` / `AudioFrame` / `EncodedVideoFrame` | 同名 Python 类（仅 `sdk.MEDIA_ENABLED == True` 时导出，音频回调支持本机和远端模式，视频回调需要本机模式；详见媒体 SDK 手册） |
 | `ButtonDefine` / `AxesDefine` / `GPSSignalLevel` / `GEOGCoordMode` / `UWBPairState` / `MotionControlMode` | 同名 `IntEnum`（按键/摇杆下标、GPS/UWB/坐标系解码用） |
 
 ## 6. 已知限制
@@ -387,10 +387,22 @@ finally:
 - 不支持 Windows（仅 Linux）
 - 不支持 Python 多解释器嵌入
 - 观测帧 Python 回调（高级 `set_motion_observed_callback`，约 50Hz）受 GIL 影响；低级高频观测请用拉模式 `get_latest_observation()`（≥ 500 Hz）
-- 媒体帧订阅仅支持 `aarch64` 板内本地部署；`x86_64` / `i386` 默认构建为 `sdk.MEDIA_ENABLED == False`，不要调用 `create_media_bus_client()`、`setup()` 或 `start_*_frame()`。运行库包仍需保持同版本、同架构 `.so` 文件成组放置。
+- 运行库和 Python 扩展需与设备版本匹配；远端音频参数见下方 PCM 示例。
 
 ## 7. 许可证
 
 本仓库中的 UniUbi 原创 Python binding、示例和文档使用 Apache License 2.0。vendored pybind11 按其原始许可证授权。详见 [LICENSE](LICENSE)、[NOTICE](NOTICE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 - [手柄观测](docs/trc-observation.zh-CN.md)
+
+## PCM 音频采集与播放
+
+x86_64、i386、aarch64 默认开启 MediaBus。Orin 本机模式支持视频、音频和布局查询；远端模式通过 `media.setup(host)` 支持 PCM 采集和 RawBack 播放。远端视频订阅和布局查询返回 `kNotSupported`。SDK 头文件、运行库、Python 扩展与设备软件必须版本匹配。
+
+[example_audio.py](examples/example_audio.py) · [example_audio_rawback.py](examples/example_audio_rawback.py) · [音频使用指南](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/stream-pcm-audio.zh-CN.md)
+
+远端 PC 播放并采集音频：
+
+```bash
+sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" python3 examples/example_audio_rawback.py input.pcm --host <DV500_IP> --device-id <ROBOT_SN> --interface <DDS_INTERFACE> --capture-channel 0
+```

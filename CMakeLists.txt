@@ -23,11 +23,7 @@ else()
 endif()
 
 if(NOT DEFINED UNIUBI_SDK_ENABLE_MEDIA)
-    if(UNIUBI_SDK_ARCH_DIR STREQUAL "x86_64" OR UNIUBI_SDK_ARCH_DIR STREQUAL "i386")
-        set(UNIUBI_SDK_ENABLE_MEDIA OFF)
-    else()
-        set(UNIUBI_SDK_ENABLE_MEDIA ON)
-    endif()
+    set(UNIUBI_SDK_ENABLE_MEDIA ON)
 endif()
 message(STATUS "Uniubi Python SDK media bindings: ${UNIUBI_SDK_ENABLE_MEDIA}")
 
@@ -114,9 +110,19 @@ set_target_properties(_uniubi_robot_motion_py_native PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/python/robot_motion_sdk
 )
 
+# 仅复制 Python 源码，避免源码目录遗留扩展进入开发包或 wheel。
+file(GLOB_RECURSE SDK_PYTHON_SOURCES CONFIGURE_DEPENDS
+     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/robot_motion_sdk/*.py)
+foreach(source IN LISTS SDK_PYTHON_SOURCES)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/${source}
+                   ${CMAKE_CURRENT_BINARY_DIR}/python/${source} COPYONLY)
+endforeach()
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/robot_motion_sdk
+        DESTINATION . FILES_MATCHING PATTERN "*.py")
+
 # wheel 模式 (scikit-build-core)：DESTINATION 相对 wheel 根（即 site-packages），
-# 装到 robot_motion_sdk/ 目录下；__init__.py 由 pyproject.toml 的 wheel.packages 负责打包
+# 装到 robot_motion_sdk/ 目录下；Python 源码由上方 install(DIRECTORY ...) 打包
 install(TARGETS _uniubi_robot_motion_py_native LIBRARY DESTINATION robot_motion_sdk)

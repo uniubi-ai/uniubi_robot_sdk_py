@@ -166,3 +166,5 @@ highlevel> quit
 ```
 
 `--read-only` 只表示启动时不申请控制权，进入 CLI 后仍可显式执行 `take`。程序退出时会清零 walking 速度、释放控制权、关闭观测并显式 `disconnect()`，不会依赖 Python GC 清理。该清理路径不会自动调用 `stop_action()`；如果动作仍可能处于活动状态，应先显式输入 `stop`，再输入 `release`。
+
+音频示例： [example_audio.py](example_audio.py)（本机采集） · [example_audio_rawback.py](example_audio_rawback.py)（本机或远端播放，可同时采集）。远端参数和环境见 [PCM guide](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/stream-pcm-audio.zh-CN.md).

@@ -31,7 +31,8 @@ Documentation = "https://uniubi.com"
 [tool.scikit-build]
 # CMake 入口在当前目录（这个 Python 子项目自带 CMakeLists.txt）
 cmake.version = ">=3.18"
-wheel.packages = ["robot_motion_sdk"]
+wheel.packages = []
+sdist.exclude = ["robot_motion_sdk/*.so", "robot_motion_sdk/__pycache__/**", "build/**"]
 # 把 native .so 装到包内
 install.components = []
 build-dir = "build/{wheel_tag}"

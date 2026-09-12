@@ -12,6 +12,7 @@ from . import _uniubi_robot_motion_py_native as _native  # noqa: F401  本地编
 MEDIA_ENABLED = bool(getattr(_native, "MEDIA_ENABLED", False))
 
 if MEDIA_ENABLED:
+    AudioRawBackError = _native.AudioRawBackError
     from .media_frame import (
         AudioEncode,
         AudioFrame,
@@ -173,6 +174,33 @@ service = _URobotService()
 # ---------------------------------------------------------------------------
 #  MediaBusClient
 # ---------------------------------------------------------------------------
+class AudioRawBackStream:
+    """PCM RawBack 发送流；后端由 MediaBusClient 的运行环境决定。"""
+
+    def __init__(self, impl) -> None:
+        self._impl = impl
+
+    def write(self, frame: AudioFrame) -> bool:
+        return self._impl.write(frame._impl)
+
+    def setup(self) -> bool:
+        return self._impl.setup()
+
+    def shutdown(self) -> None:
+        self._impl.shutdown()
+
+    def ready(self) -> bool:
+        return self._impl.ready()
+
+    def get_last_error(self) -> AudioRawBackError:
+        return AudioRawBackError(self._impl.get_last_error())
+
+    def reset(self) -> bool:
+        return self._impl.reset()
+
+    def set_volume(self, volume: int) -> bool:
+        return self._impl.set_volume(volume)
+
 class MediaBusClient:
     """音视频帧订阅客户端。
 
@@ -194,9 +222,9 @@ class MediaBusClient:
     def __init__(self, impl) -> None:
         self._impl = impl
 
-    def setup(self) -> bool:
-        """初始化媒体总线连接（订阅前必须先调用）。"""
-        return self._impl.setup()
+    def setup(self, host: str = "") -> bool:
+        """初始化媒体总线；客户板模式必须传入 DV500 地址。"""
+        return self._impl.setup(host)
 
     def shutdown(self) -> None:
         """断开媒体总线连接，停止所有订阅。"""
@@ -213,6 +241,11 @@ class MediaBusClient:
             MediaLayout（mic_num / camera_num / video_encoder_num）。
         """
         return self._impl.get_media_layout()
+
+    def create_audio_raw_back(self) -> Optional[AudioRawBackStream]:
+        """创建当前后端的 RawBack 流；返回后调用 setup()。"""
+        impl = self._impl.create_audio_raw_back()
+        return None if impl is None else AudioRawBackStream(impl)
 
     # — 视频原始帧 —
     def start_raw_video_frame(self, channel: int, callback: Callable[[int, VideoFrame], None]) -> bool:
@@ -697,6 +730,7 @@ __all__ = [
 
 if MEDIA_ENABLED:
     __all__ += [
+        "AudioRawBackError", "AudioRawBackStream",
         "MediaBusClient",
         "MediaBusError",
         "MediaPixelFormat", "VideoStreamType", "VideoEncode", "AudioEncode",
