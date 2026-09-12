@@ -406,3 +406,7 @@ x86_64、i386、aarch64 默认开启 MediaBus。Orin 本机模式支持视频、
 ```bash
 sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" python3 examples/example_audio_rawback.py input.pcm --host <DV500_IP> --device-id <ROBOT_SN> --interface <DDS_INTERFACE> --capture-channel 0
 ```
+
+### NV21 与四路 PCM 采集
+
+使用 `--capture-all` 保存每路摄像头 5 张 NV21 图像和四路各 20 秒 PCM。配置模板、命令与验收方法：[NV21 与四路 PCM 采集](docs/media-capture.zh-CN.md)。

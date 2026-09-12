@@ -148,3 +148,7 @@ highlevel> quit
 `--read-only` only prevents control acquisition at startup; you can still explicitly enter `take` from the CLI. On exit, the program zeros walking velocity, releases control, stops observation, and explicitly calls `disconnect()` rather than relying on Python garbage collection. This cleanup path does not call `stop_action()` automatically; issue `stop` explicitly before `release` when an action may still be active.
 
 Audio examples: [example_audio.py](example_audio.py) (local capture) · [example_audio_rawback.py](example_audio_rawback.py) (local or remote playback, with optional capture). For remote arguments and setup, see [PCM guide](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/stream-pcm-audio.md).
+
+### NV21 and four-channel PCM capture
+
+Use `--capture-all` to save five NV21 images per camera and four 20-second PCM files. Configuration template, commands and validation: [NV21 and four-channel PCM capture](../docs/media-capture.md).

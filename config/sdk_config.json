@@ -1,0 +1,125 @@
+{
+ "streamDefine": {
+  "streamMemory": {
+   "total": 5,
+   "unit": "M",
+   "chunk": 1024,
+   "align": 4
+  },
+  "mediaBus": {
+   "domain": "mediaBus",
+   "node": "sdkClient",
+   "server": "mediaServer",
+   "memoryPool": [
+    {
+     "name": "mem1k",
+     "blockSize": 1024,
+     "blockCount": 2
+    },
+    {
+     "name": "mem2k",
+     "blockSize": 2048,
+     "blockCount": 2
+    },
+    {
+     "name": "mem4k",
+     "blockSize": 4096,
+     "blockCount": 2
+    },
+    {
+     "name": "mem64k",
+     "blockSize": 65536,
+     "blockCount": 4
+    },
+    {
+     "name": "mem1024k",
+     "blockSize": 1048576,
+     "blockCount": 4
+    }
+   ]
+  },
+  "viStream": [
+   {
+    "streamNo": 0,
+    "channel": {
+     "name": "mediaServer.viChannel.0"
+    }
+   },
+   {
+    "streamNo": 1,
+    "channel": {
+     "name": "mediaServer.viChannel.1"
+    }
+   }
+  ],
+  "aiStream": [
+   {
+    "streamNo": 0,
+    "channel": {
+     "name": "mediaServer.aiChannel.0.0"
+    }
+   },
+   {
+    "streamNo": 1,
+    "channel": {
+     "name": "mediaServer.aiChannel.0.1"
+    }
+   },
+   {
+    "streamNo": 2,
+    "channel": {
+     "name": "mediaServer.aiChannel.0.2"
+    }
+   },
+   {
+    "streamNo": 3,
+    "channel": {
+     "name": "mediaServer.aiChannel.0.3"
+    }
+   }
+  ],
+  "videoEncode": [
+   [
+    {
+     "stream": 0,
+     "encoder": 0,
+     "viDevice": 0,
+     "codec": 5
+    }
+   ],
+   [
+    {
+     "stream": 0,
+     "encoder": 1,
+     "viDevice": 1,
+     "codec": 5
+    }
+   ]
+  ],
+  "audioEncode": [
+   {
+    "encoder": 0,
+    "aiDevice": 0
+   },
+   {
+    "encoder": 1,
+    "aiDevice": 0
+   }
+  ],
+  "streamSource": {
+   "localChannel": 2,
+   "attribute": [
+    {
+     "stream": 1,
+     "attachVideo": 0,
+     "attachAudio": 0
+    },
+    {
+     "stream": 1,
+     "attachVideo": 1,
+     "attachAudio": 1
+    }
+   ]
+  }
+ }
+}
