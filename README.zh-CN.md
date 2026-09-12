@@ -17,7 +17,7 @@
 - Python ≥ 3.8
 - 已编译的 SDK 运行库（位于 `$UNIUBI_SDK_ROOT/lib/<arch>/` 或 `/opt/uniubi/lib/<arch>/`，`<arch>` ∈ `x86_64/aarch64/aarch64_host/i386`）：
   - `librobotMotionSdk.so`、`libmediaBus.so`、`libudbus.so`、`libubase.so`：运行库包按同版本、同架构成组提供
-  - x86_64、i386、aarch64、aarch64_host 默认开启 MediaBus。Orin 本机模式支持视频、音频和布局查询；远端模式通过 `media.setup(host)` 支持 PCM 采集和 RawBack 播放。远端视频订阅和布局查询返回 `kNotSupported`。SDK 头文件、运行库、Python 扩展与设备软件必须版本匹配。
+  - x86_64、i386、aarch64、aarch64_host 默认开启 MediaBus。Orin 本机模式支持视频、音频和布局查询；远端模式通过 `media.setup(host)` 支持 PCM 采集和 RawBack 播放。MediaBus SDK 的远端视频订阅和布局查询返回 `kNotSupported`；远端摄像头视频可通过 RTSP 独立获取。SDK 头文件、运行库、Python 扩展与设备软件必须版本匹配。
 - pybind11 已 vendor 到 `ThirdParty/pybind11/`，无需另装
 
 ### Orin Low-level TensorRT 环境
@@ -439,9 +439,20 @@ finally:
 
 - [手柄观测](docs/trc-observation.zh-CN.md)
 
+## RTSP 摄像头视频
+
+x86 host、ARM64 host 可通过 RTSP 获取两路摄像头视频，无需调用 SDK，也不需要申请运动控制权。
+
+```text
+rtsp://<设备IP>:554/live?channel=1&stream=0
+rtsp://<设备IP>:554/live?channel=2&stream=0
+```
+
+设备 IP 支持有线 IP 或 Wi-Fi IP；`channel` 为 `1` 或 `2`，`stream` 固定为 `0`。使用 VLC、FFplay 等 RTSP 客户端即可。完整命令见 [RTSP 远端摄像头取流](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/use-media-and-device-io.zh-CN.md#rtsp远端摄像头取流)。
+
 ## PCM 音频采集与播放
 
-x86_64、i386、aarch64、aarch64_host 默认开启 MediaBus。Orin 本机模式支持视频、音频和布局查询；远端模式通过 `media.setup(host)` 支持 PCM 采集和 RawBack 播放。远端视频订阅和布局查询返回 `kNotSupported`。SDK 头文件、运行库、Python 扩展与设备软件必须版本匹配。
+x86_64、i386、aarch64、aarch64_host 默认开启 MediaBus。Orin 本机模式支持视频、音频和布局查询；远端模式通过 `media.setup(host)` 支持 PCM 采集和 RawBack 播放。MediaBus SDK 的远端视频订阅和布局查询返回 `kNotSupported`；远端摄像头视频可通过 RTSP 独立获取。SDK 头文件、运行库、Python 扩展与设备软件必须版本匹配。
 
 [example_audio.py](examples/example_audio.py) · [example_audio_rawback.py](examples/example_audio_rawback.py) · [音频使用指南](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/stream-pcm-audio.zh-CN.md)
 

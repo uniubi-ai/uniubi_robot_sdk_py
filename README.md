@@ -17,7 +17,7 @@ Python bindings for the robot motion-control SDK, built with pybind11. They prov
 - Python 3.8 or later
 - Compiled SDK runtime libraries under `$UNIUBI_SDK_ROOT/lib/<arch>/` or `/opt/uniubi/lib/<arch>/`, where `<arch>` is `x86_64`, `aarch64`, `aarch64_host`, or `i386`:
   - `librobotMotionSdk.so`, `libmediaBus.so`, `libudbus.so`, and `libubase.so` must be delivered as a matched version and architecture set.
-  - MediaBus is enabled by default on x86_64, i386, aarch64, and aarch64_host. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. Remote video subscriptions and layout queries return `kNotSupported`. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
+  - MediaBus is enabled by default on x86_64, i386, aarch64, and aarch64_host. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. MediaBus SDK remote-video subscriptions and layout queries return `kNotSupported`; remote camera video is available independently over RTSP. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
 - pybind11 is vendored under `ThirdParty/pybind11/`; no separate installation is required.
 
 ### Orin Low-level TensorRT environment
@@ -420,9 +420,20 @@ Original UniUbi Python bindings, examples, and documentation in this repository 
 
 - [Remote-controller observations](docs/trc-observation.md)
 
+## RTSP camera video
+
+x86 and ARM64 hosts can access two camera streams over RTSP without calling the SDK or acquiring motion control.
+
+```text
+rtsp://<DEVICE_IP>:554/live?channel=1&stream=0
+rtsp://<DEVICE_IP>:554/live?channel=2&stream=0
+```
+
+Use the device Ethernet or Wi-Fi IP address. Set `channel` to `1` or `2`; `stream` is always `0`. Open the URL in an RTSP client such as VLC or FFplay. See [RTSP remote camera streaming](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/use-media-and-device-io.md#rtsp-remote-camera-streaming) for complete commands.
+
 ## PCM audio capture and playback
 
-MediaBus is enabled by default on x86_64, i386, aarch64, and aarch64_host. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. Remote video subscriptions and layout queries return `kNotSupported`. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
+MediaBus is enabled by default on x86_64, i386, aarch64, and aarch64_host. Local Orin deployment supports video, audio, and layout queries; remote deployment supports PCM capture and RawBack playback via `media.setup(host)`. MediaBus SDK remote-video subscriptions and layout queries return `kNotSupported`; remote camera video is available independently over RTSP. SDK headers, runtime libraries, Python extensions, and device software must use matching versions.
 
 [example_audio.py](examples/example_audio.py) · [example_audio_rawback.py](examples/example_audio_rawback.py) · [Audio guide](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/stream-pcm-audio.md)
 
