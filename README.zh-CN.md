@@ -51,7 +51,7 @@ Python wheel 不内置 SDK 运行库。Orin 和外部主机 wheel 可能具有�
 
 ### 依赖
 
-- 机器人版本必须 **大于等于 1.01.005**。低于该版本的机器人请先升级后再使用本 SDK。
+- 机器人版本必须 **大于等于 1.00.000**。低于该版本的机器人请先升级后再使用本 SDK。
 - Python ≥ 3.8
 - 已编译的 SDK 运行库（位于 `$UNIUBI_SDK_ROOT/lib/<arch>/` 或 `/opt/uniubi/lib/<arch>/`，`<arch>` ∈ `x86_64/aarch64/aarch64_host/i386`）：
   - `librobotMotionSdk.so`、`libmediaBus.so`、`libudbus.so`、`libubase.so`：运行库包按同版本、同架构成组提供

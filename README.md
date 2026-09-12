@@ -51,7 +51,7 @@ For remote media, connect the High-level client using the robot device ID, then 
 
 ### Requirements
 
-- The robot version must be **1.01.005 or later**. Upgrade robots running an earlier version before using this SDK.
+- The robot version must be **1.00.000 or later**. Upgrade robots running an earlier version before using this SDK.
 - Python 3.8 or later
 - Compiled SDK runtime libraries under `$UNIUBI_SDK_ROOT/lib/<arch>/` or `/opt/uniubi/lib/<arch>/`, where `<arch>` is `x86_64`, `aarch64`, `aarch64_host`, or `i386`:
   - `librobotMotionSdk.so`, `libmediaBus.so`, `libudbus.so`, and `libubase.so` must be delivered as a matched version and architecture set.
