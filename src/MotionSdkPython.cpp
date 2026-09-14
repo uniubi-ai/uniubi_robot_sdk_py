@@ -131,6 +131,12 @@ PYBIND11_MODULE(_uniubi_robot_motion_py_native, m) {
             py::arg("iface"),
             "Specify network interface (e.g. 'eth0' / 'wlan0') for multi-device/remote mode; "
             "must be called before initial. Empty string = let Cyclone DDS auto-select")
+        .def("set_network_config", [](IMotionSdkService& self, const std::string& configJson) {
+                return self.setNetworkConfig(configJson.c_str());
+            },
+            py::arg("config_json"),
+            "Apply network settings from a JSON string, e.g. "
+            "{\"iface\":\"eth0\",\"dont_route\":true}; must be called before initial")
         .def("set_discover_callback", [](IMotionSdkService& self, py::function cb) {
                 if (!cb) {
                     self.setDiscoverCallback(nullptr);

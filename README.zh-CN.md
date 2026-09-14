@@ -229,6 +229,8 @@ with sdk.MotionLowLevelClient() as client:
 
 `MotionLowLevelClient.send_max_torque(action)` 可设置各电机最大扭矩。该接口只在 `kPrepared` 生效，使用 `action.motors[i].limb_no` / `joint_no` 定位电机、`torque` 携带目标上限；它是低频配置接口，不应放入高频 `send_control()` 控制循环。构建和运行 Python native 模块时，binding、公开头和 `librobotMotionSdk.so` 必须来自同一套 SDK。
 
+**外部主机网线直连机器人网口时**，先在开发板上给机器人分配 IP（见[连接外设](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/connect-peripherals.zh-CN.md)）。
+
 ### HighLevel
 
 High-level 既可在机器人大脑板内运行，也可在外部 Linux 主机运行。完整示例是交互式 CLI，启动后不会自动执行动作。首次连接先使用只读模式。
@@ -326,6 +328,15 @@ with sdk.MotionHighLevelClient(device_id=target_sn) as client:
 也可以接收这些参数。`stand_up()` / `lie_down()` 受当前姿态和服务端状态机约束，不能
 作为通用的往返测试。带非零速度的 `walking` / `move()`，以及 `bipedStand` / `handstand` / `jump*` /
 `damp()` 属于高风险运动动作，应在空旷场地和人工接管条件下执行。
+
+**外部主机网线直连机器人网口时**，加 `--dont-route`，只使用直连网段的 DDS 地址。机器人 Wi-Fi 同时开启时必须加，否则 DDS 可能选中主机不可达的 Wi-Fi 地址；机器人 Wi-Fi 未开启时可加可不加：
+
+```bash
+UNIUBI_IFACE=enp3s0
+env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 examples/example_highlevel.py \
+  --iface "$UNIUBI_IFACE" --device-id ROBOT_SN --dont-route --read-only
+```
 
 ### MediaBus
 

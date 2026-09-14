@@ -217,6 +217,8 @@ Action-related control frames should also carry a `LowLevelMotionCmd`. For examp
 
 `MotionLowLevelClient.send_max_torque(action)` sets each motor's maximum torque. It is effective only in `kPrepared`; it identifies motors with `action.motors[i].limb_no` / `joint_no` and carries the target limit in `torque`. This is a low-frequency configuration interface and must not be placed in the high-frequency `send_control()` loop. When building and running the Python native module, the binding, public headers, and `librobotMotionSdk.so` must all come from the same SDK delivery.
 
+When an external host is cabled straight into the robot Ethernet port, first lease an IP to the robot (see [Connect Peripherals](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/connect-peripherals.md)).
+
 ### HighLevel
 
 High-level control can run either on the robot's brain board or on an external Linux host. The complete example is an interactive CLI and does not execute an action automatically. Use read-only mode for the first connection.
@@ -307,6 +309,15 @@ with sdk.MotionHighLevelClient(device_id=target_sn) as client:
 ```
 
 For initial hardware integration, complete read-only checks first, then use the all-zero `walking` request above to validate ownership, action startup, and status feedback. `stop_action()` stops every current action, returns the effective action to zero-speed `walking`, and retains control; starting `walking` with full zero parameters is the equivalent explicit transition. `set_action_params()` with zero values only changes the current action's parameters, while supported speed parameters can also be updated for actions such as `bipedStand` and `handstand`. `stand_up()` / `lie_down()` depend on the current posture and server state machine, so they are not a universal round-trip test. `walking` / `move()` with nonzero velocity, plus `bipedStand` / `handstand` / `jump*` / `damp()`, are high-risk motions and require a clear area with a human ready to intervene.
+
+When the external host is cabled straight into the robot Ethernet port, add `--dont-route` so only directly connected DDS locators are used. It is required when the robot Wi-Fi is also on (otherwise DDS may pick the unreachable Wi-Fi address) and optional otherwise:
+
+```bash
+UNIUBI_IFACE=enp3s0
+env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+  python3 examples/example_highlevel.py \
+  --iface "$UNIUBI_IFACE" --device-id ROBOT_SN --dont-route --read-only
+```
 
 ### MediaBus
 

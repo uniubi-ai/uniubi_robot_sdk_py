@@ -6,6 +6,7 @@ Motion SDK — Python 包装层
 
 from __future__ import annotations
 
+import json as _json
 from typing import Callable, Optional
 
 from . import _uniubi_robot_motion_py_native as _native  # noqa: F401  本地编译的 .so
@@ -136,6 +137,25 @@ class _URobotService:
         空字符串 = 由 Cyclone DDS 自动选择接口
         """
         _native.MotionSdkService.instance().set_network_interface(iface)
+
+    @staticmethod
+    def set_network_config(config) -> bool:
+        """设置网络相关配置（JSON，字段均可选；须在 initial 之前调）。
+
+        支持字段：
+
+        - ``iface``: 网卡名，如 ``"eth0"``（等价于 set_network_interface）
+        - ``dont_route``: 仅使用直连（同子网）链路收发 DDS（CycloneDDS ``<DontRoute>``）
+
+        可传 JSON 字符串或 dict，例如::
+
+            service.set_network_config({"iface": "eth0", "dont_route": True})
+
+        :return: 解析并应用成功返回 True
+        """
+        if not isinstance(config, str):
+            config = _json.dumps(config)
+        return _native.MotionSdkService.instance().set_network_config(config)
 
     @staticmethod
     def set_discover_callback(cb: Callable[[str, str], None]) -> None:

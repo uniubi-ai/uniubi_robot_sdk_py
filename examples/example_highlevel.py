@@ -103,6 +103,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="list discovered robots and exit without creating a client",
     )
+    parser.add_argument(
+        "--dont-route",
+        action="store_true",
+        help="keep only directly connected DDS locators (direct cable; set if the robot Wi-Fi is on)",
+    )
     parser.add_argument("--lease-ms", type=int, default=60000)
     parser.add_argument("--discovery-timeout", type=float, default=10.0)
     parser.add_argument(
@@ -482,6 +487,9 @@ def main() -> int:
         # Discovery and log callbacks, plus the DDS interface, must be set before init.
         sdk.service.set_discover_callback(discovery.callback)
     sdk.service.set_network_interface(args.iface)
+    if args.dont_route:
+        # Direct cable to the robot: keep only directly connected DDS locators.
+        sdk.service.set_network_config({"iface": args.iface, "dont_route": True})
     if not sdk.service.initial(None, args.client_id):
         print("[FAIL] sdk.service.initial", file=sys.stderr)
         return 1
