@@ -1,12 +1,14 @@
-"""Media frame subscription example for Motion SDK.
+"""Low-level media frame example. connect() may switch motion ownership.
+Exit restores factory motion mode. Do not run alongside another controller.
+No motor commands are sent; prefer example_media_frames.py for media-only use.
 
 Usage:
-  python3 example_media_frames.py [config|-] [client_id] [device_id|-] \
+  python3 example_media_frames_lowlevel.py [config|-] [client_id] [device_id|-] \
       [video_channel] [audio_channel] [seconds] [network_iface|-]
 
 Examples:
-  python3 example_media_frames.py
-  python3 example_media_frames.py - mediaFramePythonExample - 0 0 10 eth0
+  python3 example_media_frames_lowlevel.py
+  python3 example_media_frames_lowlevel.py - mediaFrameLowLevelPythonExample - 0 0 10 eth0
 
 This video/layout example requires aarch64 local board deployment.
 Use example_audio_rawback.py with --host and --device-id for remote audio.
@@ -20,7 +22,7 @@ Motion SDK service; it does not replace /etc/robot/sdk_config.json, which
 MediaBus setup always reads. The first 10 frames of each type are saved under
 /tmp/media_frame_dump. See ../docs/troubleshooting.md for error mapping.
 
-帧订阅统一走 MediaBusClient：先 connect() 一个 High-level 客户端，
+帧订阅统一走 MediaBusClient：先 connect() 一个 Low-level 客户端，
 再 client.create_media_bus_client() 拿到 MediaBusClient，setup() 后即可
 start_raw_video_frame / start_raw_audio_frame / start_encoded_video_frame。
 回调签名分别为 (channel, VideoFrame) / (channel, AudioFrame) /
@@ -69,7 +71,7 @@ def _on_signal(signum, frame):
 @dataclass
 class Options:
     config_file: Optional[str] = None
-    client_id: str = "mediaFramePythonExample"
+    client_id: str = "mediaFrameLowLevelPythonExample"
     device_id: str = ""
     video_channel: int = 0
     audio_channel: int = 0
@@ -149,7 +151,7 @@ def _print_usage(program: str) -> None:
     print("       --pcm4 is an alias; saves 5 NV21 images per camera and 4 PCM streams.")
     print("       config configures the Motion SDK service; '-' uses its defaults.")
     print("       MediaBus setup always reads /etc/robot/sdk_config.json.")
-    print(f"example: {program} - mediaFramePythonExample - 0 0 10 eth0")
+    print(f"example: {program} - mediaFrameLowLevelPythonExample - 0 0 10 eth0")
 
 
 def _is_aarch64_local_media_target() -> bool:
@@ -701,7 +703,7 @@ def main() -> int:
 
     sdk.service.set_log_callback(_on_log)
 
-    client: Optional[sdk.MotionHighLevelClient] = None
+    client: Optional[sdk.MotionLowLevelClient] = None
     media = None
     subscribed_video_raw = False
     subscribed_video_encoded = False
@@ -720,15 +722,15 @@ def main() -> int:
             print("this video/layout example requires local deployment; use example_audio_rawback.py for remote audio")
             return 1
 
-        # MediaBusClient 由已 connect 的客户端工厂分配；使用 High-level 客户端建立非控制连接，
-        # 这里只取音视频帧，不申请运动控制权。
-        client = sdk.MotionHighLevelClient()
+        # MediaBusClient 由已 connect 的客户端工厂分配；使用 Low-level 客户端建立运控会话，
+        # 这里只取音视频帧，不使能电机；退出时恢复出厂运控模式。
+        client = sdk.MotionLowLevelClient()
         if not client.connect():
             print(f"connect failed: {client.get_last_error()}")
             return 1
 
         deadline = time.monotonic() + 5.0
-        while client.get_state() != sdk.HighLevelState.kConnected:
+        while client.get_state() != sdk.LowLevelState.kConnected:
             if _stop or time.monotonic() > deadline:
                 print("wait connected timeout")
                 return 1
@@ -810,16 +812,24 @@ def main() -> int:
         if options.capture_dir is None:
             _print_summary(stats)
 
+        restore_ok = True
         if client is not None:
             try:
+                restore_ok = client.restore_motion_control_mode()
+                if not restore_ok:
+                    print(f"ERROR: restore motion control mode failed: {client.get_last_error()}", file=sys.stderr)
+            except Exception as exc:
+                restore_ok = False
+                print(f"ERROR: restore motion control mode raised: {exc}", file=sys.stderr)
+            finally:
                 client.disconnect()
-            except Exception as exc:  # noqa: BLE001
-                print(f"disconnect raised: {exc}")
 
         try:
             sdk.service.shutdown()
         except Exception as exc:  # noqa: BLE001
             print(f"shutdown raised: {exc}")
+        if not restore_ok:
+            raise SystemExit(2)
 
 
 if __name__ == "__main__":
