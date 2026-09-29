@@ -9,11 +9,19 @@
 - `MotionHighLevelClient`：高级控制（预置动作、RPC 控制权）
 - `MediaBusClient`：统一媒体入口，支持本机音视频和远端音频，由 `client.create_media_bus_client()` 创建。
 
+## 固件—SDK 兼容表
+
+| 固件版本 | SDK 版本 |
+| --- | --- |
+| `Cyvet-V1.00.002` 及以上 | `main` |
+| 低于 `Cyvet-V1.00.002` | tag `Cyvet-V1.00.001` |
+
+下文安装示例默认使用 `main`，适用于 `Cyvet-V1.00.002` 及以上固件；旧固件请按上表选择 tag `Cyvet-V1.00.001`。
+
 ## 1. 快速安装
 
 ### 依赖
 
-- 机器人软件版本要求：Cyvet-V1.00.000-V1.00.001。
 - Python ≥ 3.8
 - 已编译的 SDK 运行库（位于 `$UNIUBI_SDK_ROOT/lib/<arch>/` 或 `/opt/uniubi/lib/<arch>/`，`<arch>` ∈ `x86_64/aarch64/aarch64_host/i386`）：
   - `librobotMotionSdk.so`、`libmediaBus.so`、`libudbus.so`、`libubase.so`：运行库包按同版本、同架构成组提供
@@ -81,7 +89,7 @@ SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定
 在对应目标机器上执行下方 pip 安装命令。
 
 ```bash
-git clone --branch Cyvet-V1.00.001 https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
+git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
 sh scripts/prepare_dependencies.sh
 export UNIUBI_SDK_ROOT="$PWD/.deps/uniubi_robot_sdk"
@@ -146,7 +154,7 @@ Python wheel 不内置 SDK 运行库。Orin 和外部主机 wheel 可能具有�
 ### 源码构建（开发期）
 
 ```bash
-git clone --branch Cyvet-V1.00.001 https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
+git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
 sh scripts/prepare_dependencies.sh
 export UNIUBI_SDK_ROOT="$PWD/.deps/uniubi_robot_sdk"

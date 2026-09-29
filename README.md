@@ -9,11 +9,19 @@ Python bindings for the robot motion-control SDK, built with pybind11. They prov
 - `MotionHighLevelClient`: built-in actions and RPC control ownership
 - `MediaBusClient`: unified local audio/video and remote audio access, created with `client.create_media_bus_client()`.
 
+## Firmware–SDK Compatibility
+
+| Firmware version | SDK version |
+| --- | --- |
+| `Cyvet-V1.00.002` or newer | `main` |
+| Earlier than `Cyvet-V1.00.002` | tag `Cyvet-V1.00.001` |
+
+The installation examples below use `main` and target firmware `Cyvet-V1.00.002` or newer. For older firmware, select tag `Cyvet-V1.00.001` using the compatibility table above.
+
 ## 1. Quick Installation
 
 ### Requirements
 
-- Required robot software version: Cyvet-V1.00.000-V1.00.001.
 - Python 3.8 or later
 - Compiled SDK runtime libraries under `$UNIUBI_SDK_ROOT/lib/<arch>/` or `/opt/uniubi/lib/<arch>/`, where `<arch>` is `x86_64`, `aarch64`, `aarch64_host`, or `i386`:
   - `librobotMotionSdk.so`, `libmediaBus.so`, `libudbus.so`, and `libubase.so` must be delivered as a matched version and architecture set.
@@ -76,7 +84,7 @@ See [Local MediaBus Configuration](docs/troubleshooting.md#local-mediabus-config
 Run the pip installation commands below on the corresponding target machine.
 
 ```bash
-git clone --branch Cyvet-V1.00.001 https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
+git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
 sh scripts/prepare_dependencies.sh
 export UNIUBI_SDK_ROOT="$PWD/.deps/uniubi_robot_sdk"
@@ -141,7 +149,7 @@ Python wheels do not bundle SDK runtime libraries. Orin and external-host wheels
 ### Editable source build
 
 ```bash
-git clone --branch Cyvet-V1.00.001 https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
+git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
 sh scripts/prepare_dependencies.sh
 export UNIUBI_SDK_ROOT="$PWD/.deps/uniubi_robot_sdk"
