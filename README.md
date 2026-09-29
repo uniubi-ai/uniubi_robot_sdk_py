@@ -76,17 +76,24 @@ See [Local MediaBus Configuration](docs/troubleshooting.md#local-mediabus-config
 Run the pip installation commands below on the corresponding target machine.
 
 ```bash
-git clone https://github.com/uniubi-ai/uniubi_robot_sdk.git ~/uniubi_robot_sdk
-git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
+git clone --branch Cyvet-V1.00.001 https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
-export UNIUBI_SDK_ROOT=~/uniubi_robot_sdk   # or pass -Ccmake.define.UNIUBI_SDK_ROOT=...
+sh scripts/prepare_dependencies.sh
+export UNIUBI_SDK_ROOT="$PWD/.deps/uniubi_robot_sdk"
+# x86 host: x86_64; brain board: aarch64; external ARM64 host: aarch64_host
+export SDK_ARCH=x86_64
+export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 ```
+
+`dependencies.lock` pins the C++ SDK by full commit SHA, including its tracked headers and runtime libraries. The preparation script needs only Shell and Git, checks out that commit under `.deps/`, and refuses to overwrite a dirty dependency checkout. Run it again after changing the Python SDK revision; use a fresh build directory when changing SDK roots or platforms. Select `SDK_ARCH` above for the actual target and preserve this runtime-library path when launching applications. The wheel does not bundle these libraries: keep the matching `.deps/uniubi_robot_sdk/lib/<arch>/` alongside the installed package.
 
 #### Brain board (`aarch64`)
 
 Install into the system Python on the brain board:
 
 ```bash
+export SDK_ARCH=aarch64
+export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
   python3 -m pip install .
 ```
@@ -105,7 +112,7 @@ This produces a standard wheel with an ABI suffix for the Python version, for ex
 Build artifacts are written only to isolated CMake and wheel build directories; no native `.so` is generated inside the source package directory. To create a distributable wheel:
 
 ```bash
-UNIUBI_SDK_ROOT=~/uniubi_robot_sdk python3 -m pip wheel . -w dist
+python3 -m pip wheel . -w dist
 ```
 
 For an offline environment, preinstall `scikit-build-core` and CMake, then add `--no-build-isolation` to prevent pip's temporary build environment from downloading tools.
@@ -121,7 +128,7 @@ The delivered host libraries do not depend on NVIDIA media libraries. The target
 From the Python SDK repository, build on the target ARM64 host with its Python interpreter:
 
 ```bash
-export UNIUBI_SDK_ROOT=/path/to/uniubi_robot_sdk
+export UNIUBI_SDK_ROOT="$PWD/.deps/uniubi_robot_sdk"
 python3 -m pip install . -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
 export SDK_ARCH=aarch64_host
 export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
@@ -134,10 +141,11 @@ Python wheels do not bundle SDK runtime libraries. Orin and external-host wheels
 ### Editable source build
 
 ```bash
-git clone https://github.com/uniubi-ai/uniubi_robot_sdk.git ~/uniubi_robot_sdk
-git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
+git clone --branch Cyvet-V1.00.001 https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
-sudo -H env UNIUBI_SDK_ROOT=~/uniubi_robot_sdk \
+sh scripts/prepare_dependencies.sh
+export UNIUBI_SDK_ROOT="$PWD/.deps/uniubi_robot_sdk"
+sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
   python3 -m pip install -e .
 ```
 

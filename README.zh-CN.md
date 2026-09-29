@@ -81,17 +81,24 @@ SDK Python native binding 使用 `UNIUBI_SDK_ENABLE_MEDIA` 控制媒体帧绑定
 在对应目标机器上执行下方 pip 安装命令。
 
 ```bash
-git clone https://github.com/uniubi-ai/uniubi_robot_sdk.git ~/uniubi_robot_sdk
-git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
+git clone --branch Cyvet-V1.00.001 https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
-export UNIUBI_SDK_ROOT=~/uniubi_robot_sdk   # 或在命令行加 -Ccmake.define.UNIUBI_SDK_ROOT=...
+sh scripts/prepare_dependencies.sh
+export UNIUBI_SDK_ROOT="$PWD/.deps/uniubi_robot_sdk"
+# x86 host: x86_64; brain board: aarch64; external ARM64 host: aarch64_host
+export SDK_ARCH=x86_64
+export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 ```
+
+`dependencies.lock` 通过完整 commit SHA 固定 C++ SDK（包含仓库中的头文件和运行库）。准备脚本只依赖 Shell 和 Git，将对应提交检出到 `.deps/`，遇到依赖目录有未提交改动时停止。切换 Python SDK 版本后重新运行脚本；切换 SDK 路径或平台时使用新的构建目录。上面的 `SDK_ARCH` 必须按实际目标选择，运行程序时也要保留这份运行库路径。wheel 不内置这些库，安装后仍需保留配套的 `.deps/uniubi_robot_sdk/lib/<arch>/`。
 
 #### 大脑（`aarch64`）
 
 在大脑板上安装到系统 Python：
 
 ```bash
+export SDK_ARCH=aarch64
+export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
   python3 -m pip install .
 ```
@@ -110,7 +117,7 @@ python3 -m pip install .
 构建产物只写入隔离的 CMake / wheel 构建目录，不会在源码包目录中生成 native `.so`。需要生成可分发文件时使用：
 
 ```bash
-UNIUBI_SDK_ROOT=~/uniubi_robot_sdk python3 -m pip wheel . -w dist
+python3 -m pip wheel . -w dist
 ```
 
 离线环境需要预先安装 `scikit-build-core` 和 CMake，然后为 pip 增加 `--no-build-isolation`，避免临时构建环境联网下载工具。
@@ -126,7 +133,7 @@ UNIUBI_SDK_ROOT=~/uniubi_robot_sdk python3 -m pip wheel . -w dist
 在目标 ARM64 主机的 Python SDK 仓库中，使用目标 Python 构建：
 
 ```bash
-export UNIUBI_SDK_ROOT=/path/to/uniubi_robot_sdk
+export UNIUBI_SDK_ROOT="$PWD/.deps/uniubi_robot_sdk"
 python3 -m pip install . -Ccmake.define.PLATFORM=aarch64_host -Cbuild-dir=build/aarch64_host
 export SDK_ARCH=aarch64_host
 export LD_LIBRARY_PATH="$UNIUBI_SDK_ROOT/lib/$SDK_ARCH:${LD_LIBRARY_PATH:-}"
@@ -139,10 +146,11 @@ Python wheel 不内置 SDK 运行库。Orin 和外部主机 wheel 可能具有�
 ### 源码构建（开发期）
 
 ```bash
-git clone https://github.com/uniubi-ai/uniubi_robot_sdk.git ~/uniubi_robot_sdk
-git clone https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
+git clone --branch Cyvet-V1.00.001 https://github.com/uniubi-ai/uniubi_robot_sdk_py.git ~/uniubi_robot_sdk_py
 cd ~/uniubi_robot_sdk_py
-sudo -H env UNIUBI_SDK_ROOT=~/uniubi_robot_sdk \
+sh scripts/prepare_dependencies.sh
+export UNIUBI_SDK_ROOT="$PWD/.deps/uniubi_robot_sdk"
+sudo -H env UNIUBI_SDK_ROOT="$UNIUBI_SDK_ROOT" \
   python3 -m pip install -e .
 ```
 
