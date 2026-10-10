@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Pair Python bindings with the CycloneDDS runtime update: multicast LAN discovery and explicit unicast peers.
+- Use SDK components separately rebuilt with the atomic Delegate reference-count fix.
+- Verify native network configuration and generated XML on loopback, including peer retention/clearing and invalid configuration rollback.
+
 - Support aarch64_host runtime selection for ARM64 external-host bindings and document separate build directories and wheel/runtime pairing.
 - Enable media by default on x86_64, i386, and aarch64; unify local and remote PCM capture/playback under MediaBus and AudioRawBackStream, with matching runtime libraries and examples.
 - Expose the read-only `sensor.uwb.beacon_id` field. Rebuild this extension against the matching C++ SDK and device firmware.

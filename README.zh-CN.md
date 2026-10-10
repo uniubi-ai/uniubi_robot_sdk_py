@@ -245,7 +245,28 @@ with sdk.MotionLowLevelClient() as client:
 
 `MotionLowLevelClient.send_max_torque(action)` 可设置各电机最大扭矩。该接口只在 `kPrepared` 生效，使用 `action.motors[i].limb_no` / `joint_no` 定位电机、`torque` 携带目标上限；它是低频配置接口，不应放入高频 `send_control()` 控制循环。构建和运行 Python native 模块时，binding、公开头和 `librobotMotionSdk.so` 必须来自同一套 SDK。
 
-**外部主机网线直连机器人网口时**，先在开发板上给机器人分配 IP（见[连接外设](https://github.com/uniubi-ai/uniubi-docs/blob/main/docs/how-to/connect-peripherals.zh-CN.md)）。
+### DDS 网络配置
+
+普通以太网/Wi-Fi 局域网使用默认 `AllowMulticast=true`、`dont_route=false`，不需要填写狗 IP 或 peers；`iface` 填客户端本机网卡，应用按 SN 选择机器人。SDK 自动生成 XML；不能把 ROS 2 的 `CYCLONEDDS_URI` 用法当作 SDK 的 XML 覆盖入口。
+
+专用直连时，将客户端网卡配置为 `172.29.140.2/24`（也可用不重复的 `.3`、`.4` 等有效地址；`.1` 为狗端，`.0`、`.255` 不可用），仅 DDS 直连不需要网关或 DNS。初始化前设置单播 peer `172.29.140.1:17910` 和 `dont_route=false`，并检查配置返回值。现有 High-level CLI 没有 peers 参数，需在应用中使用以下 SDK API：
+
+```python
+import robot_motion_sdk as sdk
+
+if not sdk.service.set_network_config({
+    "iface": "eth0",
+    "dont_route": False,
+    "peers": ["172.29.140.1:17910"],
+}):
+    raise RuntimeError("invalid SDK network configuration")
+if not sdk.service.initial(None, "network-example"):
+    raise RuntimeError("SDK initialization failed")
+```
+
+`peers: []` 清除之前设置的 peers，省略则保留；`dont_route` 省略也保留之前的值。普通网络若曾设置 peers，应显式清除。`--dont-route` / `dont_route=true` 仅供确实需要禁止经网关通信的场景使用，不是专用直连开关，也不再因机器人 Wi-Fi 开启而要求设置。SDK 仍生成 `AllowMulticast=true`，公开 JSON 没有关闭组播的选项；peers 是单播发现目标，不是访问白名单，也不能填 CIDR。`17910` 是当前狗端发现单播端口，不是唯一的数据端口。
+
+此前 `.2/.3/.4` 真机测试使用 `DontRoute=true`；新版 `dont_route=false` 直连配置仍需按 D04/D05 补测。跨子网或组播受限时可以配置可达的单播 peers 和 `dont_route=false`，但还需双向路由、可达的 advertised locator 和 UDP 放行，这两类真机场景尚未完成验收。
 
 ### HighLevel
 
@@ -345,14 +366,7 @@ with sdk.MotionHighLevelClient(device_id=target_sn) as client:
 作为通用的往返测试。带非零速度的 `walking` / `move()`，以及 `bipedStand` / `handstand` / `jump*` /
 `damp()` 属于高风险运动动作，应在空旷场地和人工接管条件下执行。
 
-**外部主机网线直连机器人网口时**，加 `--dont-route`，只使用直连网段的 DDS 地址。机器人 Wi-Fi 同时开启时必须加，否则 DDS 可能选中主机不可达的 Wi-Fi 地址；机器人 Wi-Fi 未开启时可加可不加：
-
-```bash
-UNIUBI_IFACE=enp3s0
-env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
-  python3 examples/example_highlevel.py \
-  --iface "$UNIUBI_IFACE" --device-id ROBOT_SN --dont-route --read-only
-```
+请按上面的 DDS 网络配置 API 设置专用直连。
 
 ### MediaBus
 

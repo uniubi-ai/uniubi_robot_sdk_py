@@ -145,15 +145,25 @@ class _URobotService:
         支持字段：
 
         - ``iface``: 网卡名，如 ``"eth0"``（等价于 set_network_interface）
-        - ``dont_route``: 仅使用直连（同子网）链路收发 DDS（CycloneDDS ``<DontRoute>``）
+        - ``dont_route``: 默认 False 允许正常路由；True 禁止经网关通信
+          （CycloneDDS ``<DontRoute>``），不是专用直连开关。
         - ``peers``: 单播发现地址列表，可带端口；跨子网时指定机器狗可达地址。
-          空列表清除已配置的 peers，不自动添加默认地址；跨子网时 dont_route 应为 False。
+          空列表清除已配置的 peers，省略则保留；不自动添加默认地址，不要填写 CIDR。
 
         未指定字段保持当前值，未知字段忽略。
 
         可传 JSON 字符串或 dict，例如::
 
-            service.set_network_config({"iface": "eth0", "dont_route": True})
+            if not service.set_network_config({
+                "iface": "eth0", "dont_route": False,
+                "peers": ["172.29.140.1:17910"],
+            }):
+                raise RuntimeError("invalid SDK network configuration")
+
+        普通局域网默认 AllowMulticast=true、dont_route=False，无需 peers。
+        专用直连使用客户端 172.29.140.2/24 和上述 peer；新版 False 配置仍需真机补测。
+        必须在 initial 前调用并检查结果；dont_route 省略保留之前的值。
+        SDK 自动 XML 不等于 CYCLONEDDS_URI 覆盖入口。
 
         :return: 解析并应用成功返回 True
         """
