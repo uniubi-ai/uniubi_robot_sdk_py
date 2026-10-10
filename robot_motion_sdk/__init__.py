@@ -146,6 +146,10 @@ class _URobotService:
 
         - ``iface``: 网卡名，如 ``"eth0"``（等价于 set_network_interface）
         - ``dont_route``: 仅使用直连（同子网）链路收发 DDS（CycloneDDS ``<DontRoute>``）
+        - ``peers``: 单播发现地址列表，可带端口；跨子网时指定机器狗可达地址。
+          空列表清除已配置的 peers，不自动添加默认地址；跨子网时 dont_route 应为 False。
+
+        未指定字段保持当前值，未知字段忽略。
 
         可传 JSON 字符串或 dict，例如::
 
