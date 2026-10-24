@@ -11,12 +11,13 @@
 
 ## 固件—SDK 兼容表
 
-| 固件版本 | SDK 版本 |
+| 固件版本 | Python SDK 版本 |
 | --- | --- |
-| `Cyvet-V1.00.002` 及以上 | `main` |
-| 低于 `Cyvet-V1.00.002` | tag `Cyvet-V1.00.001` |
+| `Cyvet-V1.00.003` 及以上 | `main` |
+| `Cyvet-V1.00.002` | Git tag `Cyvet-V1.00.002` |
+| 低于 `Cyvet-V1.00.002` | Git tag `Cyvet-V1.00.001` |
 
-下文安装示例默认使用 `main`，适用于 `Cyvet-V1.00.002` 及以上固件；旧固件请按上表选择 tag `Cyvet-V1.00.001`。
+下文安装示例默认使用 `main`，适用于 `Cyvet-V1.00.003` 及以上固件。固件为 `Cyvet-V1.00.002` 时，应在克隆后、准备依赖前执行 `git checkout Cyvet-V1.00.002`；更早固件则选择 `Cyvet-V1.00.001`。Python 与 C++ SDK 使用配套的同名 tag；`main` 通过 `dependencies.lock` 固定匹配的 C++ SDK 提交。升级时须使用匹配的 C++ SDK 头文件和运行库重新构建/安装 Python 包，并按上表匹配固件版本。
 
 ## 1. 快速安装
 

@@ -11,12 +11,13 @@ Python bindings for the robot motion-control SDK, built with pybind11. They prov
 
 ## Firmware–SDK Compatibility
 
-| Firmware version | SDK version |
+| Firmware version | Python SDK version |
 | --- | --- |
-| `Cyvet-V1.00.002` or newer | `main` |
-| Earlier than `Cyvet-V1.00.002` | tag `Cyvet-V1.00.001` |
+| `Cyvet-V1.00.003` or newer | `main` |
+| `Cyvet-V1.00.002` | Git tag `Cyvet-V1.00.002` |
+| Earlier than `Cyvet-V1.00.002` | Git tag `Cyvet-V1.00.001` |
 
-The installation examples below use `main` and target firmware `Cyvet-V1.00.002` or newer. For older firmware, select tag `Cyvet-V1.00.001` using the compatibility table above.
+The installation examples below use `main` and target firmware `Cyvet-V1.00.003` or newer. For firmware `Cyvet-V1.00.002`, run `git checkout Cyvet-V1.00.002` after cloning and before preparing dependencies; for earlier firmware, select `Cyvet-V1.00.001` instead. The Python and C++ SDK tags are paired; on `main`, `dependencies.lock` pins the matching C++ SDK commit. When upgrading, rebuild/reinstall the Python package with the matching C++ SDK headers and runtime libraries, and use the firmware version in the table.
 
 ## 1. Quick Installation
 
